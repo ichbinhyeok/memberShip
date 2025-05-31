@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.example.membership.domain.user.MembershipLevel;
+import org.example.membership.common.enums.MembershipLevel;
 
 import java.time.LocalDateTime;
 
@@ -17,6 +17,9 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "user_id", insertable = false, updatable = false)
+    private Long userId;
 
     @Column(nullable = false, length = 100)
     private String name;

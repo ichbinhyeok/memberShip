@@ -1,4 +1,63 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.example.membership.domain.user.UserMapper">
-</mapper> 
+    <resultMap id="userResultMap" type="org.example.membership.domain.user.User">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="name" column="name"/>
+        <result property="membershipLevel" column="membership_level"/>
+        <result property="lastMembershipChange" column="last_membership_change"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <resultMap id="membershipInfoResponseMap" type="org.example.membership.dto.MembershipInfoResponse">
+        <result property="userId" column="id"/>
+        <result property="userName" column="name"/>
+        <result property="currentLevel" column="membership_level"/>
+        <result property="lastMembershipChange" column="last_membership_change"/>
+    </resultMap>
+
+    <select id="findById" resultMap="userResultMap">
+        SELECT * FROM users WHERE id = #{id}
+    </select>
+
+    <select id="findAll" resultMap="userResultMap">
+        SELECT * FROM users
+    </select>
+
+    <select id="selectMemberShipInfo" resultMap="membershipInfoResponseMap">
+        SELECT id, name, membership_level, last_membership_change
+        FROM users
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="org.example.membership.domain.user.User" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (
+            name,
+            membership_level,
+            last_membership_change,
+            created_at
+        ) VALUES (
+            #{name},
+            #{membershipLevel},
+            #{lastMembershipChange},
+            #{createdAt}
+        )
+    </insert>
+
+    <update id="update" parameterType="org.example.membership.domain.user.User">
+        UPDATE users
+        SET name = #{name},
+            membership_level = #{membershipLevel},
+            last_membership_change = #{lastMembershipChange}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM users WHERE id = #{id}
+    </delete>
+
+    <select id="findByMembershipLevel" resultMap="userResultMap">
+        SELECT * FROM users WHERE membership_level = #{level}
+    </select>
+</mapper>

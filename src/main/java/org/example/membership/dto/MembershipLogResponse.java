@@ -2,7 +2,7 @@ package org.example.membership.dto;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.example.membership.domain.user.MembershipLevel;
+import org.example.membership.common.enums.MembershipLevel;
 
 import java.time.LocalDateTime;
 

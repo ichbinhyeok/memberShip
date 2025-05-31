@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.example.membership.domain.user.User;
+import org.example.membership.common.enums.OrderStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -23,7 +24,10 @@ public class Order {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "order_amount", nullable = false, precision = 10, scale = 2)
+    @Column(name = "user_id", insertable = false, updatable = false)
+    private Long userId;
+
+    @Column(name = "order_amount")
     private BigDecimal orderAmount;
 
     @Enumerated(EnumType.STRING)
@@ -37,4 +41,4 @@ public class Order {
     protected void onCreate() {
         orderedAt = LocalDateTime.now();
     }
-} 
+}

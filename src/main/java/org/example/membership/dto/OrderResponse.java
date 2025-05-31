@@ -2,7 +2,7 @@ package org.example.membership.dto;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.example.membership.domain.order.OrderStatus;
+import org.example.membership.common.enums.OrderStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
