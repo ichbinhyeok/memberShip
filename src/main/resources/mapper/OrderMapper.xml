@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="org.example.membership.mybatis.mapper.OrderMapper">
-    <resultMap id="orderResultMap" type="org.example.membership.mybatis.entity.Order">
+<mapper namespace="org.example.membership.domain.order.mybatis.OrderMapper">
+    <resultMap id="orderResultMap" type="org.example.membership.domain.order.Order">
         <id property="id" column="id"/>
         <result property="userId" column="user_id"/>
         <result property="orderAmount" column="order_amount"/>
@@ -17,7 +17,7 @@
         SELECT * FROM orders WHERE user_id = #{userId}
     </select>
 
-    <insert id="insert" parameterType="org.example.membership.mybatis.entity.Order" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="org.example.membership.domain.order.Order" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO orders (
             user_id,
             order_amount,
@@ -30,4 +30,24 @@
             #{orderedAt}
         )
     </insert>
+
+    <select id="findById" resultMap="orderResultMap">
+        SELECT * FROM orders WHERE id = #{id}
+    </select>
+
+    <select id="findByUserIdOrderByCreatedAtDesc" resultMap="orderResultMap">
+        SELECT * FROM orders WHERE user_id = #{userId} ORDER BY ordered_at DESC
+    </select>
+
+    <update id="update" parameterType="org.example.membership.domain.order.Order">
+        UPDATE orders
+        SET order_amount = #{orderAmount},
+            status = #{status},
+            ordered_at = #{orderedAt}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM orders WHERE id = #{id}
+    </delete>
 </mapper> 

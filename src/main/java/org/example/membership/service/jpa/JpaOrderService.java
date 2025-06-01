@@ -1,9 +1,9 @@
 package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.common.enums.OrderStatus;
 import org.example.membership.domain.order.Order;
-import org.example.membership.domain.order.OrderRepository;
-import org.example.membership.domain.order.OrderStatus;
+import org.example.membership.domain.order.jpa.OrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

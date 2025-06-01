@@ -11,7 +11,11 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import javax.sql.DataSource;
 
 @Configuration
-@MapperScan(basePackages = "org.example.membership.domain")
+@MapperScan(basePackages = {
+        "org.example.membership.domain.log.mybatis",
+        "org.example.membership.domain.user.mybatis",
+        "org.example.membership.domain.order.mybatis"
+})
 public class MyBatisConfig {
 
     @Bean

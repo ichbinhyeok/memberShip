@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.domain.user.User;
-import org.example.membership.domain.user.MembershipLevel;
 
 import java.time.LocalDateTime;
 

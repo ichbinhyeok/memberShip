@@ -1,9 +1,9 @@
 package org.example.membership.service.mybatis;
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.domain.user.User;
-import org.example.membership.domain.user.UserMapper;
-import org.example.membership.domain.user.MembershipLevel;
+import org.example.membership.domain.user.mybatis.UserMapper;
 import org.example.membership.dto.MembershipInfoResponse;
 import org.example.membership.exception.NotFoundException;
 import org.springframework.stereotype.Service;

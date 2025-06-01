@@ -2,7 +2,7 @@ package org.example.membership.service.mybatis;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.domain.order.Order;
-import org.example.membership.domain.order.OrderMapper;
+import org.example.membership.domain.order.mybatis.OrderMapper;
 import org.example.membership.common.enums.OrderStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,10 +43,6 @@ public class MyBatisOrderService {
         orderMapper.deleteById(id);
     }
 
-    @Transactional(readOnly = true)
-    public List<Order> getOrdersByStatus(OrderStatus status) {
-        return orderMapper.findByStatus(status);
-    }
 
     @Transactional(readOnly = true)
     public List<Order> getOrdersByUserId(Long userId) {

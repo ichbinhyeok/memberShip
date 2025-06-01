@@ -1,9 +1,9 @@
 package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.domain.user.User;
-import org.example.membership.domain.user.UserRepository;
-import org.example.membership.domain.user.MembershipLevel;
+import org.example.membership.domain.user.jpa.UserRepository;
 import org.example.membership.dto.MembershipInfoResponse;
 import org.example.membership.exception.NotFoundException;
 import org.springframework.stereotype.Service;
