@@ -24,8 +24,8 @@ public class Order {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "user_id", insertable = false, updatable = false)
-    private Long userId;
+//    @Column(name = "user_id", insertable = false, updatable = false)
+//    private Long userId;
 
     @Column(name = "order_amount")
     private BigDecimal orderAmount;
@@ -41,4 +41,6 @@ public class Order {
     protected void onCreate() {
         orderedAt = LocalDateTime.now();
     }
+
+
 }

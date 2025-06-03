@@ -10,7 +10,7 @@ import java.util.List;
 
 @Mapper
 public interface UserMapper {
-    void insert(@Param("user") User user); // ✅ XML의 <insert id="insert">
+    void insert( User user); // ✅ XML의 <insert id="insert">
 
     User findById(@Param("id") Long id);   // ✅ <select id="findById">
 
@@ -23,4 +23,6 @@ public interface UserMapper {
     void deleteById(@Param("id") Long id); // ✅ <delete id="deleteById">
 
     List<User> findByMembershipLevel(@Param("level") MembershipLevel level); // ✅ <select id="findByMembershipLevel">
+
+    MembershipInfoResponse selectMemberShipInfoByName(@Param("userName")  String username);
 }

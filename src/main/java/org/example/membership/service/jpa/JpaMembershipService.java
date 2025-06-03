@@ -26,6 +26,12 @@ public class JpaMembershipService {
         return userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User not found"));
     }
+    @Transactional(readOnly = true)
+    public MembershipInfoResponse getUserByName(String name) {
+      User user = userRepository.findByName(name).orElseThrow(() -> new NotFoundException("User not found"));
+
+        return MembershipInfoResponse.from(user);
+    }
 
     @Transactional(readOnly = true)
     public List<User> getAllUsers() {

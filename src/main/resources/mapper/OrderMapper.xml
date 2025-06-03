@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.example.membership.domain.order.mybatis.OrderMapper">
-    <resultMap id="orderResultMap" type="org.example.membership.domain.order.Order">
+
+    <resultMap id="orderResultMap" type="org.example.membership.dto.OrderResponse">
         <id property="id" column="id"/>
         <result property="userId" column="user_id"/>
         <result property="orderAmount" column="order_amount"/>
@@ -17,18 +18,21 @@
         SELECT * FROM orders WHERE user_id = #{userId}
     </select>
 
-    <insert id="insert" parameterType="org.example.membership.domain.order.Order" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert"
+            parameterType="org.example.membership.dto.OrderRequest"
+            useGeneratedKeys="true"
+            keyProperty="id">
         INSERT INTO orders (
             user_id,
             order_amount,
             status,
             ordered_at
         ) VALUES (
-            #{userId},
-            #{orderAmount},
-            #{status},
-            #{orderedAt}
-        )
+                     #{userId},
+                     #{orderAmount},
+                     #{status},
+                     #{orderedAt}
+                 )
     </insert>
 
     <select id="findById" resultMap="orderResultMap">

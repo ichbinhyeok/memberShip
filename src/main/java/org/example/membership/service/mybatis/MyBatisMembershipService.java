@@ -9,6 +9,7 @@ import org.example.membership.exception.NotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -18,6 +19,7 @@ public class MyBatisMembershipService {
 
     @Transactional
     public User createUser(User user) {
+        user.setCreatedAt(LocalDateTime.now());
         userMapper.insert(user);
         return user;
     }
@@ -28,6 +30,16 @@ public class MyBatisMembershipService {
         if (response == null) {
             throw new NotFoundException("User not found");
         }
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public MembershipInfoResponse getUserByUsername(String username) {
+        MembershipInfoResponse response = userMapper.selectMemberShipInfoByName(username);
+        if (response == null) {
+            throw new NotFoundException("User not found");
+        }
+
         return response;
     }
 

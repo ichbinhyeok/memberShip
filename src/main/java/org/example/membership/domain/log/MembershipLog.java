@@ -23,8 +23,8 @@ public class MembershipLog {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "user_id", insertable = false, updatable = false)
-    private Long userId;
+//    @Column(name = "user_id", insertable = false, updatable = false)
+//    private Long userId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "previous_level")

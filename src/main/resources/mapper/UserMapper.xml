@@ -31,6 +31,14 @@
         WHERE id = #{id}
     </select>
 
+
+    <select id="selectMemberShipInfoByName" resultMap="membershipInfoResponseMap">
+        SELECT id, name, membership_level, last_membership_change
+        FROM users
+        WHERE name = #{userName}
+    </select>
+
+
     <insert id="insert" parameterType="org.example.membership.domain.user.User" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO users (
             name,

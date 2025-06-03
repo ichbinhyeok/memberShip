@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.OrderStatus;
 import org.example.membership.domain.order.Order;
 import org.example.membership.domain.order.jpa.OrderRepository;
+import org.example.membership.dto.OrderResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,7 +49,18 @@ public class JpaOrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<Order> getOrdersByUserId(Long userId) {
-        return orderRepository.findByUserId(userId);
+    public List<OrderResponse> getOrdersByUserId(Long userId) {
+        List<Order> orders = orderRepository.findByUser_Id(userId);
+
+        return orders.stream().map(order -> {
+            OrderResponse dto = new OrderResponse();
+            dto.setId(order.getId());
+            dto.setUserId(order.getUser().getId());
+            dto.setOrderAmount(order.getOrderAmount());
+            dto.setStatus(order.getStatus());
+            dto.setOrderedAt(order.getOrderedAt());
+            return dto;
+        }).toList();
     }
+
 } 

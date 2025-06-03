@@ -4,9 +4,11 @@ import lombok.RequiredArgsConstructor;
 import org.example.membership.domain.order.Order;
 import org.example.membership.domain.order.mybatis.OrderMapper;
 import org.example.membership.common.enums.OrderStatus;
+import org.example.membership.dto.OrderRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -15,7 +17,8 @@ public class MyBatisOrderService {
     private final OrderMapper orderMapper;
 
     @Transactional
-    public Order createOrder(Order order) {
+    public OrderRequest createOrder(OrderRequest order) {
+        order.setOrderedAt(LocalDateTime.now());
         orderMapper.insert(order);
         return order;
     }
