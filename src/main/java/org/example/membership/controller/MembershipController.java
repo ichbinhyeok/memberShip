@@ -5,9 +5,12 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.membership.domain.user.User;
+import org.example.membership.dto.CreateUserRequest;
 import org.example.membership.dto.MembershipInfoResponse;
+import org.example.membership.dto.UserResponse;
 import org.example.membership.service.jpa.JpaMembershipService;
 import org.example.membership.service.mybatis.MyBatisMembershipService;
 import org.springframework.http.ResponseEntity;
@@ -69,27 +72,32 @@ public class MembershipController {
         return ResponseEntity.ok(myBatisMembershipService.getUserByUsername(userName));
     }
 
+
+
     @Operation(summary = "JPA로 사용자 생성", description = "JPA를 사용하여 새로운 사용자를 생성합니다.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "생성 성공"),
-        @ApiResponse(responseCode = "400", description = "잘못된 요청")
+            @ApiResponse(responseCode = "200", description = "생성 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청")
     })
     @PostMapping("/createUser/jpa")
-    public ResponseEntity<User> createUserJpa(
-        @Parameter(description = "사용자 정보", required = true) @RequestBody User user
+    public ResponseEntity<UserResponse> createUserJpa(
+            @Parameter(description = "사용자 정보", required = true)
+            @Valid @RequestBody CreateUserRequest request
     ) {
-        return ResponseEntity.ok(jpaMembershipService.createUser(user));
+        return ResponseEntity.ok(UserResponse.from(jpaMembershipService.createUser(request)));
     }
 
     @Operation(summary = "MyBatis로 사용자 생성", description = "MyBatis를 사용하여 새로운 사용자를 생성합니다.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "생성 성공"),
-        @ApiResponse(responseCode = "400", description = "잘못된 요청")
+            @ApiResponse(responseCode = "200", description = "생성 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청")
     })
     @PostMapping("/createUser/mybatis")
-    public ResponseEntity<User> createUserMyBatis(
-        @Parameter(description = "사용자 정보", required = true) @RequestBody User user
+    public ResponseEntity<UserResponse> createUserMyBatis(
+            @Parameter(description = "사용자 정보", required = true)
+            @Valid @RequestBody CreateUserRequest request
     ) {
-        return ResponseEntity.ok(myBatisMembershipService.createUser(user));
+        return ResponseEntity.ok(UserResponse.from(myBatisMembershipService.createUser(request)));
     }
+
 } 

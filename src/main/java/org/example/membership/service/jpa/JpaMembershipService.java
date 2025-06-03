@@ -4,12 +4,15 @@ import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.domain.user.User;
 import org.example.membership.domain.user.jpa.UserRepository;
+import org.example.membership.dto.CreateUserRequest;
 import org.example.membership.dto.MembershipInfoResponse;
 import org.example.membership.exception.NotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -17,9 +20,18 @@ public class JpaMembershipService {
     private final UserRepository userRepository;
 
     @Transactional
-    public User createUser(User user) {
+    public User createUser(CreateUserRequest request) {
+        User user = new User();
+        user.setName(request.getName());
+
+        // 명시적으로 null 체크 → 기본값 유지
+        if (request.getMembershipLevel() != null) {
+            user.setMembershipLevel(request.getMembershipLevel());
+        }
         return userRepository.save(user);
     }
+
+
 
     @Transactional(readOnly = true)
     public User getUserById(Long id) {

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.domain.user.User;
 import org.example.membership.domain.user.mybatis.UserMapper;
+import org.example.membership.dto.CreateUserRequest;
 import org.example.membership.dto.MembershipInfoResponse;
 import org.example.membership.exception.NotFoundException;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -18,11 +20,20 @@ public class MyBatisMembershipService {
     private final UserMapper userMapper;
 
     @Transactional
-    public User createUser(User user) {
-        user.setCreatedAt(LocalDateTime.now());
-        userMapper.insert(user);
+    public User createUser(CreateUserRequest request) {
+        User user = new User();
+        user.setName(request.getName());
+
+        // 기본값은 SILVER, null 방어
+        if (request.getMembershipLevel() != null) {
+            user.setMembershipLevel(request.getMembershipLevel());
+        }
+
+        user.setCreatedAt(LocalDateTime.now()); // MyBatis는 직접 세팅 필요
+        userMapper.insert(user); // id 자동 주입됨
         return user;
     }
+
 
     @Transactional(readOnly = true)
     public MembershipInfoResponse getUserById(Long id) {
