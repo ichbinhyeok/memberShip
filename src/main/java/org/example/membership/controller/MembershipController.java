@@ -7,22 +7,29 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.membership.domain.user.User;
 import org.example.membership.dto.CreateUserRequest;
 import org.example.membership.dto.MembershipInfoResponse;
 import org.example.membership.dto.UserResponse;
+import org.example.membership.service.jpa.JpaMembershipRenewalService;
 import org.example.membership.service.jpa.JpaMembershipService;
 import org.example.membership.service.mybatis.MyBatisMembershipService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StopWatch;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 @Tag(name = "멤버십 관리", description = "멤버십 관련 API")
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
+@Slf4j
 public class MembershipController {
     private final JpaMembershipService jpaMembershipService;
     private final MyBatisMembershipService myBatisMembershipService;
+    private final JpaMembershipRenewalService jpaMembershipRenewalService;
 
     @Operation(summary = "JPA로 사용자 멤버십 조회", description = "사용자 ID로 JPA를 사용하여 멤버십 정보를 조회합니다.")
     @ApiResponses(value = {
@@ -98,6 +105,18 @@ public class MembershipController {
             @Valid @RequestBody CreateUserRequest request
     ) {
         return ResponseEntity.ok(UserResponse.from(myBatisMembershipService.createUser(request)));
+    }
+
+    @Operation(summary = "jpa로 등급 갱신", description = "jpa로 등급 갱신합니다.")
+    @PostMapping("/renew/fixed")
+    public ResponseEntity<Void> renewFixedDate() {
+        StopWatch watch = new StopWatch();
+        watch.start();
+        jpaMembershipRenewalService.renewMembershipLevel(LocalDate.of(2025, 6, 1));
+        watch.stop();
+        log.info("💡 jpa로 등급 갱신 controller 시간: {} ms", watch.getTotalTimeMillis());
+        return ResponseEntity.ok().build();
+
     }
 
 } 

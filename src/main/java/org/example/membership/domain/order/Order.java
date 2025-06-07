@@ -39,7 +39,9 @@ public class Order {
 
     @PrePersist
     protected void onCreate() {
-        orderedAt = LocalDateTime.now();
+        if (orderedAt == null) {
+            orderedAt = LocalDateTime.now();
+        }
     }
 
 
