@@ -5,11 +5,15 @@
     <insert id="insert" parameterType="org.example.membership.domain.log.MembershipLog">
         INSERT INTO membership_log (
             user_id,
-            changed_level,
+            previous_level,
+            new_level,
+            change_reason,
             changed_at
         ) VALUES (
-                     #{userId},
-                     #{changedLevel},
+                     #{user.id},
+                     #{previousLevel},
+                     #{newLevel},
+                     #{changeReason},
                      #{changedAt}
                  )
     </insert>

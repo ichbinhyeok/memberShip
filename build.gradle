@@ -51,6 +51,8 @@ dependencies {
     testImplementation 'org.testcontainers:mysql:1.19.3'
     testImplementation 'org.testcontainers:junit-jupiter:1.19.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+
 }
 
 tasks.named('test') {

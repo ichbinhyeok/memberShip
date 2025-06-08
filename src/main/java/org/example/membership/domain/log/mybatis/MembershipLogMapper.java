@@ -6,5 +6,5 @@ import org.example.membership.domain.log.MembershipLog;
 
 @Mapper
 public interface MembershipLogMapper {
-    void insert(@Param("membershipLog") MembershipLog membershipLog);
+    void insert(MembershipLog membershipLog);
 }

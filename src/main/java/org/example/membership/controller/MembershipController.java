@@ -14,6 +14,7 @@ import org.example.membership.dto.MembershipInfoResponse;
 import org.example.membership.dto.UserResponse;
 import org.example.membership.service.jpa.JpaMembershipRenewalService;
 import org.example.membership.service.jpa.JpaMembershipService;
+import org.example.membership.service.mybatis.MyBatisMembershipRenewalService;
 import org.example.membership.service.mybatis.MyBatisMembershipService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StopWatch;
@@ -30,6 +31,8 @@ public class MembershipController {
     private final JpaMembershipService jpaMembershipService;
     private final MyBatisMembershipService myBatisMembershipService;
     private final JpaMembershipRenewalService jpaMembershipRenewalService;
+    private final MyBatisMembershipRenewalService myBatisMembershipRenewalService;
+
 
     @Operation(summary = "JPA로 사용자 멤버십 조회", description = "사용자 ID로 JPA를 사용하여 멤버십 정보를 조회합니다.")
     @ApiResponses(value = {
@@ -118,5 +121,30 @@ public class MembershipController {
         return ResponseEntity.ok().build();
 
     }
+    @Operation(summary = "mybatis로 등급 갱신", description = "mybatis로 등급 갱신합니다.")
+    @PostMapping("/renew/mybatis/fixed")
+    public ResponseEntity<Void> renewFixedDateMyBatis() {
+        StopWatch watch = new StopWatch();
+        watch.start();
+        myBatisMembershipRenewalService.renewMembershipLevel(LocalDate.of(2025, 6, 1));
+        watch.stop();
+        log.info("💡 mybatis로 등급 갱신 controller 시간: {} ms", watch.getTotalTimeMillis());
+        return ResponseEntity.ok().build();
+
+    }
+
+    @Operation(summary = "mybatis_batch로 등급 갱신", description = "mybatis_batch로 등급 갱신합니다.")
+    @PostMapping("/renew/mybatis/batch/fixed")
+    public ResponseEntity<Void> renewFixedDateMyBatisByBatch() {
+        StopWatch watch = new StopWatch();
+        watch.start();
+        myBatisMembershipRenewalService.renewMembershipLevelBatch(LocalDate.of(2025, 6, 1));
+        watch.stop();
+        log.info("💡 mybatis_batch로 등급 갱신 controller 시간: {} ms", watch.getTotalTimeMillis());
+        return ResponseEntity.ok().build();
+
+    }
+
+
 
 } 

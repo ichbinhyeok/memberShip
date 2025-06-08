@@ -4,7 +4,9 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.example.membership.domain.order.Order;
 import org.example.membership.dto.OrderRequest;
+import org.example.membership.dto.UserOrderTotal;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -16,4 +18,6 @@ public interface OrderMapper {
     List<Order> findAll(); //
     void update(@Param("order") Order order); //
     void deleteById(@Param("id") Long id); //
-}
+
+    List<UserOrderTotal> sumOrderAmountByUserBetween(@Param("start") java.time.LocalDateTime start,
+                                                     @Param("end") java.time.LocalDateTime end);}

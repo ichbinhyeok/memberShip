@@ -54,4 +54,12 @@
     <delete id="deleteById" parameterType="long">
         DELETE FROM orders WHERE id = #{id}
     </delete>
+
+    <select id="sumOrderAmountByUserBetween" resultType="org.example.membership.dto.UserOrderTotal">
+        SELECT user_id      AS userId,
+               SUM(order_amount) AS totalAmount
+        FROM orders
+        WHERE ordered_at BETWEEN #{start} AND #{end}
+        GROUP BY user_id
+    </select>
 </mapper> 

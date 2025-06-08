@@ -43,6 +43,9 @@ management:
 
 logging:
   level:
-    org.hibernate.SQL: DEBUG # Hibernate SQL 쿼리 로깅
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE # SQL 바인딩 파라미터 값 로깅 (디버깅에 유용하나, 프로덕션에서는 주의)
-    org.springframework.batch: DEBUG # Spring Batch 관련 로깅
+    org.mybatis: DEBUG
+    org.apache.ibatis: DEBUG
+    org.springframework.jdbc.core: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.batch: DEBUG
