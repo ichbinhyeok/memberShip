@@ -127,8 +127,8 @@ public class MyBatisMembershipRenewalService {
 
                 if (processed % BATCH_SIZE == 0) {
                     batchSession.flushStatements();
-                    batchSession.commit();
-                    batchSession.clearCache();
+                   // batchSession.commit();
+                   // batchSession.clearCache();
                 }
             }
 
@@ -141,6 +141,7 @@ public class MyBatisMembershipRenewalService {
         log.info("✅ MyBatis (배치) 등급 갱신 완료 - 처리 유저 수: {}, 총 소요 시간: {} ms",
                 users.size(), watch.getTotalTimeMillis());
     }
+
 
     /**
      * 등급 계산 로직
@@ -168,4 +169,6 @@ public class MyBatisMembershipRenewalService {
             return "등급 유지 (전월 주문합계: " + amount + ")";
         }
     }
+
+
 }
