@@ -156,6 +156,7 @@ public class MembershipController {
 
     }
 
+
     @Operation(
             summary = "등급 자동 갱신 + 로그 저장 (JDBC 배치)",
             description = "결제 집계 데이터를 기반으로 회원 등급을 계산하고, 사용자 등급을 업데이트하며 로그를 배치 저장합니다."

@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -36,7 +37,7 @@ public class MyBatisMembershipRenewalService {
     private static final int BATCH_SIZE = 1000;
 
     /**
-     * ✅ 일반 MyBatis 처리 (단건 update + insert 방식)
+     * ✅ 일반 MyBatis 처리 (단간 update + insert 방식)
      */
     public void renewMembershipLevel(LocalDate targetDate) {
         StopWatch watch = new StopWatch();
@@ -81,7 +82,7 @@ public class MyBatisMembershipRenewalService {
     }
 
     /**
-     * ✅ 배치 모드 처리 (ExecutorType.BATCH + flushStatements)
+     * ✅ 배치 모드 처리 (ExecutorType.BATCH + flushStatements + multi-row INSERT)
      */
     public void renewMembershipLevelBatch(LocalDate targetDate) {
         StopWatch watch = new StopWatch();
@@ -101,9 +102,10 @@ public class MyBatisMembershipRenewalService {
 
         try (SqlSession batchSession = sqlSessionFactory.openSession(ExecutorType.BATCH, false)) {
             UserMapper batchUserMapper = batchSession.getMapper(UserMapper.class);
-            MembershipLogMapper batchLogMapper = batchSession.getMapper(MembershipLogMapper.class);
 
+            List<MembershipLog> logBuffer = new ArrayList<>();
             int processed = 0;
+
             for (User user : users) {
                 Long userId = user.getId();
                 BigDecimal totalAmount = totalAmountByUser.getOrDefault(userId, BigDecimal.ZERO);
@@ -121,19 +123,19 @@ public class MyBatisMembershipRenewalService {
                 log.setNewLevel(newLevel);
                 log.setChangeReason(getReason(oldLevel, newLevel, totalAmount));
                 log.setChangedAt(LocalDateTime.now());
-                batchLogMapper.insert(log);
 
+                logBuffer.add(log);
                 processed++;
 
                 if (processed % BATCH_SIZE == 0) {
                     batchSession.flushStatements();
-                   // batchSession.commit();
-                   // batchSession.clearCache();
+                    insertMembershipLogsInBatch(batchSession, logBuffer);
+                    logBuffer.clear();
                 }
             }
 
-            // 마지막 flush
             batchSession.flushStatements();
+            insertMembershipLogsInBatch(batchSession, logBuffer);
             batchSession.commit();
         }
 
@@ -142,6 +144,26 @@ public class MyBatisMembershipRenewalService {
                 users.size(), watch.getTotalTimeMillis());
     }
 
+    private void insertMembershipLogsInBatch(SqlSession batchSession, List<MembershipLog> logs) {
+        if (logs == null || logs.isEmpty()) return;
+
+        MembershipLogMapper logMapper = batchSession.getMapper(MembershipLogMapper.class);
+
+        final int SUB_BATCH_SIZE = 500;
+        List<MembershipLog> buffer = new ArrayList<>();
+
+        for (MembershipLog log : logs) {
+            buffer.add(log);
+            if (buffer.size() == SUB_BATCH_SIZE) {
+                logMapper.bulkInsertLogs(buffer);
+                buffer.clear();
+            }
+        }
+
+        if (!buffer.isEmpty()) {
+            logMapper.bulkInsertLogs(buffer);
+        }
+    }
 
     /**
      * 등급 계산 로직
@@ -162,13 +184,11 @@ public class MyBatisMembershipRenewalService {
      */
     private String getReason(MembershipLevel oldLevel, MembershipLevel newLevel, BigDecimal amount) {
         if (newLevel.ordinal() > oldLevel.ordinal()) {
-            return "자동 강등 (전월 주문합계: " + amount + ")";
+            return "자동 강득 (전원 주문합계: " + amount + ")";
         } else if (newLevel.ordinal() < oldLevel.ordinal()) {
-            return "자동 승급 (전월 주문합계: " + amount + ")";
+            return "자동 승급 (전원 주문합계: " + amount + ")";
         } else {
-            return "등급 유지 (전월 주문합계: " + amount + ")";
+            return "등급 유지 (전원 주문합계: " + amount + ")";
         }
     }
-
-
 }

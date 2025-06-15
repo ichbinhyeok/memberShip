@@ -18,4 +18,26 @@
                  )
     </insert>
 
+
+    <insert id="bulkInsertLogs" parameterType="java.util.List">
+        INSERT INTO membership_log (
+        user_id,
+        previous_level,
+        new_level,
+        change_reason,
+        changed_at
+        )
+        VALUES
+        <foreach collection="list" item="log" separator=",">
+            (
+            #{log.user.id},
+            #{log.previousLevel},
+            #{log.newLevel},
+            #{log.changeReason},
+            #{log.changedAt}
+            )
+        </foreach>
+    </insert>
+
+
 </mapper>
