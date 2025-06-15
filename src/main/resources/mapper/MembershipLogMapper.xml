@@ -19,7 +19,9 @@
     </insert>
 
 
-    <insert id="bulkInsertLogs" parameterType="java.util.List">
+
+    <!-- DTO 기반 batch insert (foreach 방식) -->
+    <insert id="bulkInsertRequests" parameterType="java.util.List">
         INSERT INTO membership_log (
         user_id,
         previous_level,
@@ -30,7 +32,7 @@
         VALUES
         <foreach collection="list" item="log" separator=",">
             (
-            #{log.user.id},
+            #{log.userId},
             #{log.previousLevel},
             #{log.newLevel},
             #{log.changeReason},
@@ -39,5 +41,21 @@
         </foreach>
     </insert>
 
+    <!-- DTO 기반 단건 insert (ExecutorType.BATCH용) -->
+    <insert id="insertOneRequest" parameterType="org.example.membership.dto.MembershipLogRequest">
+        INSERT INTO membership_log (
+            user_id,
+            previous_level,
+            new_level,
+            change_reason,
+            changed_at
+        ) VALUES (
+                     #{userId},
+                     #{previousLevel},
+                     #{newLevel},
+                     #{changeReason},
+                     #{changedAt}
+                 )
+    </insert>
 
 </mapper>

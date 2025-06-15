@@ -143,19 +143,25 @@ public class MembershipController {
         return ResponseEntity.ok().build();
 
     }
-
-    @Operation(summary = "mybatis_batch로 등급 갱신", description = "mybatis_batch로 등급 갱신합니다.")
-    @PostMapping("/renew/mybatis/batch/fixed")
-    public ResponseEntity<Void> renewFixedDateMyBatisByBatch() {
+    @PostMapping("/renew/mybatis/foreach")
+    public ResponseEntity<Void> renewByForeach() {
         StopWatch watch = new StopWatch();
         watch.start();
-        myBatisMembershipRenewalService.renewMembershipLevelBatch(LocalDate.of(2025, 6, 1));
+        myBatisMembershipRenewalService.renewMembershipLevelForeach(LocalDate.of(2025, 6, 1));
         watch.stop();
-        log.info("💡 mybatis_batch로 등급 갱신 controller 시간: {} ms", watch.getTotalTimeMillis());
+        log.info("💡 mybatis-foreach 등급 갱신 controller 시간: {} ms", watch.getTotalTimeMillis());
         return ResponseEntity.ok().build();
-
     }
 
+    @PostMapping("/renew/mybatis/executor-batch")
+    public ResponseEntity<Void> renewByExecutorBatch() {
+        StopWatch watch = new StopWatch();
+        watch.start();
+        myBatisMembershipRenewalService.renewMembershipLevelExecutorBatch(LocalDate.of(2025, 6, 1));
+        watch.stop();
+        log.info("💡 mybatis-executor-batch 등급 갱신 controller 시간: {} ms", watch.getTotalTimeMillis());
+        return ResponseEntity.ok().build();
+    }
 
     @Operation(
             summary = "등급 자동 갱신 + 로그 저장 (JDBC 배치)",

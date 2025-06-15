@@ -11,6 +11,7 @@ import org.example.membership.domain.log.mybatis.MembershipLogMapper;
 import org.example.membership.domain.order.mybatis.OrderMapper;
 import org.example.membership.domain.user.User;
 import org.example.membership.domain.user.mybatis.UserMapper;
+import org.example.membership.dto.MembershipLogRequest;
 import org.example.membership.dto.UserOrderTotal;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StopWatch;
@@ -80,20 +81,49 @@ public class MyBatisMembershipRenewalService {
         log.info("✅ MyBatis 등급 갱신 완료 - 처리 유저 수: {}, 총 소요 시간: {} ms",
                 users.size(), watch.getTotalTimeMillis());
     }
-
-    /**
-     * ✅ 배치 모드 처리 (ExecutorType.BATCH + flushStatements + multi-row INSERT)
-     */
-    public void renewMembershipLevelBatch(LocalDate targetDate) {
-        StopWatch watch = new StopWatch();
-        watch.start();
-
+    public void renewMembershipLevelForeach(LocalDate targetDate) {
         LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
 
         List<UserOrderTotal> aggregates = orderMapper.sumOrderAmountByUserBetween(
-                startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX)
-        );
+                startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX));
+
+        Map<Long, BigDecimal> totalAmountByUser = aggregates.stream()
+                .collect(Collectors.toMap(UserOrderTotal::getUserId, UserOrderTotal::getTotalAmount));
+
+        List<User> users = userMapper.findAll();
+        List<MembershipLogRequest> logList = new ArrayList<>();
+
+        for (User user : users) {
+            Long userId = user.getId();
+            BigDecimal totalAmount = totalAmountByUser.getOrDefault(userId, BigDecimal.ZERO);
+
+            MembershipLevel oldLevel = user.getMembershipLevel();
+            MembershipLevel newLevel = calculateLevel(totalAmount);
+
+            user.setMembershipLevel(newLevel);
+            user.setLastMembershipChange(LocalDateTime.now());
+            userMapper.update(user);
+
+            MembershipLogRequest log = new MembershipLogRequest();
+            log.setUserId(userId);
+            log.setPreviousLevel(oldLevel);
+            log.setNewLevel(newLevel);
+            log.setChangeReason(getReason(oldLevel, newLevel, totalAmount));
+            log.setChangedAt(LocalDateTime.now());
+            logList.add(log);
+        }
+
+        membershipLogMapper.bulkInsertRequests(logList);
+    }
+
+    public void renewMembershipLevelExecutorBatch(LocalDate targetDate) {
+        int count = 0;
+        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
+        LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
+
+        List<UserOrderTotal> aggregates = orderMapper.sumOrderAmountByUserBetween(
+                startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX));
 
         Map<Long, BigDecimal> totalAmountByUser = aggregates.stream()
                 .collect(Collectors.toMap(UserOrderTotal::getUserId, UserOrderTotal::getTotalAmount));
@@ -102,9 +132,7 @@ public class MyBatisMembershipRenewalService {
 
         try (SqlSession batchSession = sqlSessionFactory.openSession(ExecutorType.BATCH, false)) {
             UserMapper batchUserMapper = batchSession.getMapper(UserMapper.class);
-
-            List<MembershipLog> logBuffer = new ArrayList<>();
-            int processed = 0;
+            MembershipLogMapper batchLogMapper = batchSession.getMapper(MembershipLogMapper.class);
 
             for (User user : users) {
                 Long userId = user.getId();
@@ -117,32 +145,24 @@ public class MyBatisMembershipRenewalService {
                 user.setLastMembershipChange(LocalDateTime.now());
                 batchUserMapper.update(user);
 
-                MembershipLog log = new MembershipLog();
-                log.setUser(user);
+                MembershipLogRequest log = new MembershipLogRequest();
+                log.setUserId(userId);
                 log.setPreviousLevel(oldLevel);
                 log.setNewLevel(newLevel);
                 log.setChangeReason(getReason(oldLevel, newLevel, totalAmount));
                 log.setChangedAt(LocalDateTime.now());
 
-                logBuffer.add(log);
-                processed++;
-
-                if (processed % BATCH_SIZE == 0) {
-                    batchSession.flushStatements();
-                    insertMembershipLogsInBatch(batchSession, logBuffer);
-                    logBuffer.clear();
+                batchLogMapper.insertOneRequest(log);
+                count++;
+                if (count % BATCH_SIZE == 0) {
+                    batchSession.flushStatements(); // 중간 배치 처리
                 }
             }
 
-            batchSession.flushStatements();
-            insertMembershipLogsInBatch(batchSession, logBuffer);
             batchSession.commit();
         }
-
-        watch.stop();
-        log.info("✅ MyBatis (배치) 등급 갱신 완료 - 처리 유저 수: {}, 총 소요 시간: {} ms",
-                users.size(), watch.getTotalTimeMillis());
     }
+
 
     private void insertMembershipLogsInBatch(SqlSession batchSession, List<MembershipLog> logs) {
         if (logs == null || logs.isEmpty()) return;
