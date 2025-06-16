@@ -35,7 +35,7 @@ public class MyBatisMembershipRenewalService {
     private final MembershipLogMapper membershipLogMapper;
     private final SqlSessionFactory sqlSessionFactory;
 
-    private static final int BATCH_SIZE = 1000;
+    private static final int BATCH_SIZE = 5000;
 
     /**
      * ✅ 일반 MyBatis 처리 (단간 update + insert 방식)
@@ -119,6 +119,7 @@ public class MyBatisMembershipRenewalService {
 
     public void renewMembershipLevelExecutorBatch(LocalDate targetDate) {
         int count = 0;
+
         LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
 
@@ -130,38 +131,62 @@ public class MyBatisMembershipRenewalService {
 
         List<User> users = userMapper.findAll();
 
+        List<User> updatedUsers = new ArrayList<>();
+        List<MembershipLogRequest> logs = new ArrayList<>();
+
+        // 1. 등급 변경 및 로그 생성
+        for (User user : users) {
+            Long userId = user.getId();
+            BigDecimal totalAmount = totalAmountByUser.getOrDefault(userId, BigDecimal.ZERO);
+
+            MembershipLevel oldLevel = user.getMembershipLevel();
+            MembershipLevel newLevel = calculateLevel(totalAmount);
+
+            user.setMembershipLevel(newLevel);
+            user.setLastMembershipChange(LocalDateTime.now());
+            updatedUsers.add(user);
+
+            MembershipLogRequest log = new MembershipLogRequest();
+            log.setUserId(userId);
+            log.setPreviousLevel(oldLevel);
+            log.setNewLevel(newLevel);
+            log.setChangeReason(getReason(oldLevel, newLevel, totalAmount));
+            log.setChangedAt(LocalDateTime.now());
+
+            logs.add(log);
+        }
+
+        // 2. 배치 실행
         try (SqlSession batchSession = sqlSessionFactory.openSession(ExecutorType.BATCH, false)) {
             UserMapper batchUserMapper = batchSession.getMapper(UserMapper.class);
             MembershipLogMapper batchLogMapper = batchSession.getMapper(MembershipLogMapper.class);
 
-            for (User user : users) {
-                Long userId = user.getId();
-                BigDecimal totalAmount = totalAmountByUser.getOrDefault(userId, BigDecimal.ZERO);
-
-                MembershipLevel oldLevel = user.getMembershipLevel();
-                MembershipLevel newLevel = calculateLevel(totalAmount);
-
-                user.setMembershipLevel(newLevel);
-                user.setLastMembershipChange(LocalDateTime.now());
+            // 2-1. User update batch
+            count = 0;
+            for (User user : updatedUsers) {
                 batchUserMapper.update(user);
+                count++;
+                if (count % BATCH_SIZE == 0) {
+                    batchSession.flushStatements();
+                }
+            }
+            batchSession.flushStatements(); // 마지막 flush
 
-                MembershipLogRequest log = new MembershipLogRequest();
-                log.setUserId(userId);
-                log.setPreviousLevel(oldLevel);
-                log.setNewLevel(newLevel);
-                log.setChangeReason(getReason(oldLevel, newLevel, totalAmount));
-                log.setChangedAt(LocalDateTime.now());
-
+            // 2-2. Log insert batch
+            count = 0;
+            for (MembershipLogRequest log : logs) {
                 batchLogMapper.insertOneRequest(log);
                 count++;
                 if (count % BATCH_SIZE == 0) {
-                    batchSession.flushStatements(); // 중간 배치 처리
+                    batchSession.flushStatements();
                 }
             }
+            batchSession.flushStatements(); // 마지막 flush
 
             batchSession.commit();
         }
     }
+
 
 
     private void insertMembershipLogsInBatch(SqlSession batchSession, List<MembershipLog> logs) {
@@ -211,4 +236,104 @@ public class MyBatisMembershipRenewalService {
             return "등급 유지 (전원 주문합계: " + amount + ")";
         }
     }
+
+    public void renewMembershipLevelExecutorBatchWithBulkInsert(LocalDate targetDate) {
+        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
+        LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
+
+        List<UserOrderTotal> aggregates = orderMapper.sumOrderAmountByUserBetween(
+                startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX));
+
+        Map<Long, BigDecimal> totalAmountByUser = aggregates.stream()
+                .collect(Collectors.toMap(UserOrderTotal::getUserId, UserOrderTotal::getTotalAmount));
+
+        List<User> users = userMapper.findAll();
+
+        List<User> updatedUsers = new ArrayList<>();
+        List<MembershipLogRequest> logs = new ArrayList<>();
+
+        for (User user : users) {
+            Long userId = user.getId();
+            BigDecimal totalAmount = totalAmountByUser.getOrDefault(userId, BigDecimal.ZERO);
+
+            MembershipLevel oldLevel = user.getMembershipLevel();
+            MembershipLevel newLevel = calculateLevel(totalAmount);
+
+            user.setMembershipLevel(newLevel);
+            user.setLastMembershipChange(LocalDateTime.now());
+            updatedUsers.add(user);
+
+            MembershipLogRequest log = new MembershipLogRequest();
+            log.setUserId(userId);
+            log.setPreviousLevel(oldLevel);
+            log.setNewLevel(newLevel);
+            log.setChangeReason(getReason(oldLevel, newLevel, totalAmount));
+            log.setChangedAt(LocalDateTime.now());
+
+            logs.add(log);
+        }
+
+        // 1. update는 ExecutorType.BATCH 사용
+        try (SqlSession batchSession = sqlSessionFactory.openSession(ExecutorType.BATCH, false)) {
+            UserMapper batchUserMapper = batchSession.getMapper(UserMapper.class);
+
+            int count = 0;
+            for (User user : updatedUsers) {
+                batchUserMapper.update(user);
+                if (++count % BATCH_SIZE == 0) {
+                    batchSession.flushStatements();
+                }
+            }
+            batchSession.flushStatements();
+            batchSession.commit();
+        }
+
+        // 2. insert는 bulk foreach 사용
+        membershipLogMapper.bulkInsertRequests(logs);
+    }
+
+
+    public void renewMembershipLevelCaseWhenInsertForeach(LocalDate targetDate) {
+        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
+        LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
+
+        List<UserOrderTotal> aggregates = orderMapper.sumOrderAmountByUserBetween(
+                startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX));
+
+        Map<Long, BigDecimal> totalAmountByUser = aggregates.stream()
+                .collect(Collectors.toMap(UserOrderTotal::getUserId, UserOrderTotal::getTotalAmount));
+
+        List<User> users = userMapper.findAll();
+
+        List<User> updatedUsers = new ArrayList<>();
+        List<MembershipLogRequest> logs = new ArrayList<>();
+
+        for (User user : users) {
+            Long userId = user.getId();
+            BigDecimal totalAmount = totalAmountByUser.getOrDefault(userId, BigDecimal.ZERO);
+
+            MembershipLevel oldLevel = user.getMembershipLevel();
+            MembershipLevel newLevel = calculateLevel(totalAmount);
+
+            user.setMembershipLevel(newLevel);
+            user.setLastMembershipChange(LocalDateTime.now());
+            updatedUsers.add(user);
+
+            MembershipLogRequest log = new MembershipLogRequest();
+            log.setUserId(userId);
+            log.setPreviousLevel(oldLevel);
+            log.setNewLevel(newLevel);
+            log.setChangeReason(getReason(oldLevel, newLevel, totalAmount));
+            log.setChangedAt(LocalDateTime.now());
+
+            logs.add(log);
+        }
+
+        // 1. update: case when 방식으로 1줄로 묶기
+        userMapper.bulkUpdateMembershipLevels(updatedUsers);
+
+        // 2. insert: foreach multi-row SQL
+        membershipLogMapper.bulkInsertRequests(logs);
+    }
+
 }

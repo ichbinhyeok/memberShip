@@ -1,7 +1,7 @@
 spring:
   datasource:
     driver-class-name: com.p6spy.engine.spy.P6SpyDriver
-    url: jdbc:p6spy:mysql://localhost:3308/membership?rewriteBatchedStatements=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    url: jdbc:p6spy:mysql://localhost:3308/membership?rewriteBatchedStatements=true&useServerPrepStmts=false&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
     password: 1234
     hikari:
@@ -18,7 +18,7 @@ spring:
     properties:
       hibernate:
         jdbc:
-          batch_size: 100   # ✅ 몇 건씩 묶을지 (성능에 따라 조정)
+          batch_size: 5000   # ✅ 몇 건씩 묶을지 (성능에 따라 조정)
         format_sql: true
         dialect: org.hibernate.dialect.MySQL8Dialect # MySQL 8 버전에 맞는 방언
 
@@ -49,6 +49,8 @@ logging:
     org.springframework.jdbc.core: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.engine.jdbc.batch.internal.BatchingBatch: DEBUG
+
 
 mybatis:
   configuration:

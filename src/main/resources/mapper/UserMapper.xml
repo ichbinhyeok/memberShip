@@ -55,8 +55,7 @@
 
     <update id="update" parameterType="org.example.membership.domain.user.User">
         UPDATE users
-        SET name = #{name},
-            membership_level = #{membershipLevel},
+        SET membership_level = #{membershipLevel},
             last_membership_change = #{lastMembershipChange}
         WHERE id = #{id}
     </update>
@@ -68,4 +67,24 @@
     <select id="findByMembershipLevel" resultMap="userResultMap">
         SELECT * FROM users WHERE membership_level = #{level}
     </select>
+
+    <update id="bulkUpdateMembershipLevels" parameterType="java.util.List">
+        UPDATE users
+        SET
+        membership_level = CASE id
+        <foreach collection="list" item="user">
+            WHEN #{user.id} THEN #{user.membershipLevel}
+        </foreach>
+        END,
+        last_membership_change = CASE id
+        <foreach collection="list" item="user">
+            WHEN #{user.id} THEN #{user.lastMembershipChange}
+        </foreach>
+        END
+        WHERE id IN
+        <foreach collection="list" item="user" open="(" separator="," close=")">
+            #{user.id}
+        </foreach>
+    </update>
+
 </mapper>

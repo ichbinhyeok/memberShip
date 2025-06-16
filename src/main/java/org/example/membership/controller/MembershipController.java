@@ -187,4 +187,25 @@ public class MembershipController {
     }
 
 
+    @PostMapping("/renew/mybatis/combined-batch")
+    public ResponseEntity<Void> renewWithExecutorBatchAndBulkInsert() {
+        StopWatch watch = new StopWatch();
+        watch.start();
+        myBatisMembershipRenewalService.renewMembershipLevelExecutorBatchWithBulkInsert(LocalDate.of(2025, 6, 1));
+        watch.stop();
+        log.info("💡 mybatis-combined-batch 등급 갱신 controller 시간: {} ms", watch.getTotalTimeMillis());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/renew/mybatis/casewhen-bulk")
+    public ResponseEntity<Void> renewWithCaseWhenBulkUpdate() {
+        StopWatch watch = new StopWatch();
+        watch.start();
+        myBatisMembershipRenewalService.renewMembershipLevelCaseWhenInsertForeach(LocalDate.of(2025, 6, 1));
+        watch.stop();
+        log.info("🚀 casewhen-bulk 등급 갱신 시간: {} ms", watch.getTotalTimeMillis());
+        return ResponseEntity.ok().build();
+    }
+
+
 } 

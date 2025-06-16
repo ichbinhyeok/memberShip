@@ -29,4 +29,6 @@ public interface UserMapper {
     MembershipInfoResponse selectMemberShipInfoByName(@Param("userName")  String username);
 
     List<UserOrderTotal> userOrderAmountBetween(LocalDateTime localDateTime, LocalDateTime localDateTime1);
+
+    void bulkUpdateMembershipLevels(List<User> updatedUsers);
 }

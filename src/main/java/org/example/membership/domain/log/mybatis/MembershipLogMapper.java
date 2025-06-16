@@ -12,6 +12,7 @@ public interface MembershipLogMapper {
     void insert(MembershipLog membershipLog);
     void bulkInsertLogs(@Param("list") List<MembershipLog> logs);
     void bulkInsertRequests(@Param("list") List<MembershipLogRequest> logs); // foreach용
+
     void insertOneRequest(MembershipLogRequest log); // ExecutorType.BATCH용
 }
 
