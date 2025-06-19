@@ -6,6 +6,8 @@ import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.domain.log.MembershipLog;
 import org.example.membership.domain.log.jdbc.JdbcMembershipLogRepository;
 import org.example.membership.domain.user.User;
+import org.example.membership.dto.MembershipLogDto;
+import org.example.membership.dto.UserDto;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
@@ -34,8 +36,7 @@ public class JdbcMembershipRenewalService {
             "SELECT id, name, membership_level, last_membership_change, created_at FROM users";
 
     private static final String SUM_ORDERS_SQL =
-            "SELECT user_id, SUM(order_amount) AS totalAmount " +
-                    "FROM orders WHERE ordered_at BETWEEN ? AND ? GROUP BY user_id";
+            "SELECT user_id, SUM(order_amount) AS totalAmount FROM orders WHERE ordered_at BETWEEN ? AND ? GROUP BY user_id";
 
     private static final String UPDATE_USER_LEVEL_SQL =
             "UPDATE users SET membership_level = ?, last_membership_change = ? WHERE id = ?";
@@ -44,9 +45,11 @@ public class JdbcMembershipRenewalService {
         StopWatch watch = new StopWatch();
         watch.start();
 
+        LocalDateTime now = LocalDateTime.now();
         LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
 
+        // 1. 주문 총합 집계
         Map<Long, BigDecimal> totalAmountByUser = jdbcTemplate.query(SUM_ORDERS_SQL, rs -> {
             Map<Long, BigDecimal> map = new HashMap<>();
             while (rs.next()) {
@@ -55,86 +58,71 @@ public class JdbcMembershipRenewalService {
             return map;
         }, startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX));
 
-        List<User> users = jdbcTemplate.query(SELECT_ALL_USERS, new UserRowMapper());
+        // 2. 유저 전체 조회
+        List<UserDto> users = jdbcTemplate.query(SELECT_ALL_USERS, (rs, rowNum) -> {
+            UserDto dto = new UserDto();
+            dto.id = rs.getLong("id");
+            dto.name = rs.getString("name");
+            dto.membershipLevel = rs.getString("membership_level");
+            Timestamp changed = rs.getTimestamp("last_membership_change");
+            dto.lastMembershipChange = changed != null ? changed.toLocalDateTime() : null;
+            Timestamp created = rs.getTimestamp("created_at");
+            dto.createdAt = created != null ? created.toLocalDateTime() : null;
+            return dto;
+        });
 
-        List<User> updatedUsers = new ArrayList<>();
-        List<MembershipLog> logs = new ArrayList<>();
-        LocalDateTime now = LocalDateTime.now();
+        List<UserDto> updatedUsers = new ArrayList<>();
+        List<MembershipLogDto> logs = new ArrayList<>();
 
-        for (User user : users) {
-            Long userId = user.getId();
-            BigDecimal totalAmount = totalAmountByUser.getOrDefault(userId, BigDecimal.ZERO);
+        for (UserDto user : users) {
+            BigDecimal totalAmount = totalAmountByUser.getOrDefault(user.id, BigDecimal.ZERO);
+            String oldLevel = user.membershipLevel;
+            String newLevel = calculateLevel(totalAmount);
 
-            MembershipLevel oldLevel = user.getMembershipLevel();
-            MembershipLevel newLevel = calculateLevel(totalAmount);
-
-            user.setMembershipLevel(newLevel);
-            user.setLastMembershipChange(now);
+            user.membershipLevel = newLevel;
+            user.lastMembershipChange = now;
             updatedUsers.add(user);
 
-            String reason;
-            if (newLevel.ordinal() > oldLevel.ordinal()) {
-                reason = "자동 강등 (전월 주문합계: " + totalAmount + ")";
-            } else if (newLevel.ordinal() < oldLevel.ordinal()) {
-                reason = "자동 승급 (전월 주문합계: " + totalAmount + ")";
-            } else {
-                reason = "등급 유지 (전월 주문합계: " + totalAmount + ")";
-            }
-
-            MembershipLog log = new MembershipLog();
-            log.setUser(user);
-            log.setPreviousLevel(oldLevel);
-            log.setNewLevel(newLevel);
-            log.setChangeReason(reason);
-            log.setChangedAt(now);
+            MembershipLogDto log = new MembershipLogDto();
+            log.userId = user.id;
+            log.previousLevel = oldLevel;
+            log.newLevel = newLevel;
+            log.changeReason = getReason(oldLevel, newLevel, totalAmount);
+            log.changedAt = now;
             logs.add(log);
         }
 
+        // 3. User update → batchUpdate
         jdbcTemplate.batchUpdate(
                 UPDATE_USER_LEVEL_SQL,
                 updatedUsers,
                 BATCH_SIZE,
                 (ps, user) -> {
-                    ps.setString(1, user.getMembershipLevel().name());
-                    ps.setTimestamp(2, Timestamp.valueOf(user.getLastMembershipChange()));
-                    ps.setLong(3, user.getId());
+                    ps.setString(1, user.membershipLevel);
+                    ps.setTimestamp(2, Timestamp.valueOf(user.lastMembershipChange));
+                    ps.setLong(3, user.id);
                 }
         );
 
+        // 4. Log insert → batchInsert
         membershipLogRepository.batchInsert(logs);
 
         watch.stop();
-        log.info("✅ JDBC 등급 갱신 완료 - 처리 유저 수: {}, 총 소요 시간: {} ms",
-                updatedUsers.size(), watch.getTotalTimeMillis());
+        log.info("✅ JDBC 리팩토링 갱신 완료 - 유저 수: {}, 소요 시간: {}ms", users.size(), watch.getTotalTimeMillis());
     }
 
-    private MembershipLevel calculateLevel(BigDecimal totalAmount) {
-        if (totalAmount.compareTo(new BigDecimal("1000000")) >= 0) {
-            return MembershipLevel.VIP;
-        } else if (totalAmount.compareTo(new BigDecimal("500000")) >= 0) {
-            return MembershipLevel.GOLD;
-        } else if (totalAmount.compareTo(new BigDecimal("100000")) >= 0) {
-            return MembershipLevel.SILVER;
-        }
-        return MembershipLevel.SILVER;
+    private String calculateLevel(BigDecimal totalAmount) {
+        if (totalAmount.compareTo(new BigDecimal("1000000")) >= 0) return "VIP";
+        if (totalAmount.compareTo(new BigDecimal("500000")) >= 0) return "GOLD";
+        if (totalAmount.compareTo(new BigDecimal("100000")) >= 0) return "SILVER";
+        return "SILVER";
     }
 
-    private static class UserRowMapper implements RowMapper<User> {
-        @Override
-        public User mapRow(ResultSet rs, int rowNum) throws SQLException {
-            User user = new User();
-            user.setId(rs.getLong("id"));
-            user.setName(rs.getString("name"));
-            user.setMembershipLevel(MembershipLevel.valueOf(rs.getString("membership_level")));
-            Timestamp lastChange = rs.getTimestamp("last_membership_change");
-            if (lastChange != null) {
-                user.setLastMembershipChange(lastChange.toLocalDateTime());
-            }
-            Timestamp created = rs.getTimestamp("created_at");
-            if (created != null) {
-                user.setCreatedAt(created.toLocalDateTime());
-            }
-            return user;
+    private String getReason(String oldLevel, String newLevel, BigDecimal totalAmount) {
+        if (!oldLevel.equals(newLevel)) {
+            return (newLevel.compareTo(oldLevel) > 0 ? "자동 강등" : "자동 승급") + " (전월 주문합계: " + totalAmount + ")";
+        } else {
+            return "등급 유지 (전월 주문합계: " + totalAmount + ")";
         }
     }
 }

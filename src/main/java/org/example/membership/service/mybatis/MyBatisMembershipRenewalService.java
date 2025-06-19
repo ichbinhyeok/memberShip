@@ -81,6 +81,7 @@ public class MyBatisMembershipRenewalService {
         log.info("✅ MyBatis 등급 갱신 완료 - 처리 유저 수: {}, 총 소요 시간: {} ms",
                 users.size(), watch.getTotalTimeMillis());
     }
+
     public void renewMembershipLevelForeach(LocalDate targetDate) {
         LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);

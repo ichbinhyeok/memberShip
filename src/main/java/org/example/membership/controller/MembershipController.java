@@ -207,5 +207,15 @@ public class MembershipController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/renew/jpa-update-foreach")
+    public ResponseEntity<Void> renewJpaUpdateForeachInsert() {
+        StopWatch watch = new StopWatch();
+        watch.start();
+        jpaMembershipRenewalService.renewMembershipLevelJpaUpdateInsertForeach(LocalDate.of(2025, 6, 1));
+        watch.stop();
+        log.info("⛳ jpa-update-foreach 등급 갱신 시간: {} ms", watch.getTotalTimeMillis());
+        return ResponseEntity.ok().build();
+    }
+
 
 } 

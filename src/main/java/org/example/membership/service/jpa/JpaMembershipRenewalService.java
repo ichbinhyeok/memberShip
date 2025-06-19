@@ -5,9 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.domain.log.MembershipLog;
 import org.example.membership.domain.log.jpa.MembershipLogRepository;
+import org.example.membership.domain.log.mybatis.MembershipLogMapper;
 import org.example.membership.domain.order.jpa.OrderRepository;
 import org.example.membership.domain.user.User;
 import org.example.membership.domain.user.jpa.UserRepository;
+import org.example.membership.dto.MembershipLogRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StopWatch;
 
@@ -28,6 +30,7 @@ public class JpaMembershipRenewalService {
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
     private final MembershipLogRepository membershipLogRepository;
+    private final MembershipLogMapper membershipLogMapper;
 
     public void renewMembershipLevel(LocalDate targetDate) {
         StopWatch watch = new StopWatch();
@@ -98,6 +101,60 @@ public class JpaMembershipRenewalService {
                 updatedUsers.size(),
                 watch.getTotalTimeMillis());
     }
+    public void renewMembershipLevelJpaUpdateInsertForeach(LocalDate targetDate) {
+        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
+        LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
+
+        List<Object[]> aggregates = orderRepository.sumOrderAmountByUserBetween(
+                startDate.atStartOfDay(),
+                endDate.atTime(LocalTime.MAX)
+        );
+
+        Map<Long, BigDecimal> totalAmountByUser = aggregates.stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (BigDecimal) row[1]
+                ));
+
+        List<User> users = userRepository.findAll();
+
+        List<User> updatedUsers = new ArrayList<>();
+        List<MembershipLogRequest> logs = new ArrayList<>();
+
+        LocalDateTime now = LocalDateTime.now();
+
+        for (User user : users) {
+            Long userId = user.getId();
+            BigDecimal totalAmount = totalAmountByUser.getOrDefault(userId, BigDecimal.ZERO);
+
+            MembershipLevel oldLevel = user.getMembershipLevel();
+            MembershipLevel newLevel = calculateLevel(totalAmount);
+
+            user.setMembershipLevel(newLevel);
+            user.setLastMembershipChange(now);
+            updatedUsers.add(user);
+
+            String reason;
+            if (newLevel.ordinal() > oldLevel.ordinal()) {
+                reason = "자동 강등 (전월 주문합계: " + totalAmount + ")";
+            } else if (newLevel.ordinal() < oldLevel.ordinal()) {
+                reason = "자동 승급 (전월 주문합계: " + totalAmount + ")";
+            } else {
+                reason = "등급 유지 (전월 주문합계: " + totalAmount + ")";
+            }
+
+            MembershipLogRequest logReq = new MembershipLogRequest();
+            logReq.setUserId(userId);
+            logReq.setPreviousLevel(oldLevel);
+            logReq.setNewLevel(newLevel);
+            logReq.setChangeReason(reason);
+            logReq.setChangedAt(now);
+            logs.add(logReq);
+        }
+
+        userRepository.saveAll(updatedUsers);
+        membershipLogMapper.bulkInsertRequests(logs);
+    }
 
     private MembershipLevel calculateLevel(BigDecimal totalAmount) {
         if (totalAmount.compareTo(new BigDecimal("1000000")) >= 0) {
@@ -109,4 +166,6 @@ public class JpaMembershipRenewalService {
         }
         return MembershipLevel.SILVER;
     }
+
+
 }
