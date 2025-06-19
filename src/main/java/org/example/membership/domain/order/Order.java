@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.example.membership.domain.coupon.Coupon;
+import org.example.membership.domain.product.Product;
 import org.example.membership.domain.user.User;
 import org.example.membership.common.enums.OrderStatus;
 
@@ -26,6 +28,15 @@ public class Order {
 
 //    @Column(name = "user_id", insertable = false, updatable = false)
 //    private Long userId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    private Product product;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coupon_id")
+    private Coupon coupon;
+
 
     @Column(name = "order_amount")
     private BigDecimal orderAmount;

@@ -5,6 +5,8 @@
     <resultMap id="orderResultMap" type="org.example.membership.dto.OrderResponse">
         <id property="id" column="id"/>
         <result property="userId" column="user_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="couponId" column="coupon_id"/>
         <result property="orderAmount" column="order_amount"/>
         <result property="status" column="status"/>
         <result property="orderedAt" column="ordered_at"/>
@@ -24,11 +26,15 @@
             keyProperty="id">
         INSERT INTO orders (
             user_id,
+            product_id,
+            coupon_id,
             order_amount,
             status,
             ordered_at
         ) VALUES (
                      #{userId},
+                     #{productId},
+                     #{couponId},
                      #{orderAmount},
                      #{status},
                      #{orderedAt}
@@ -45,7 +51,9 @@
 
     <update id="update" parameterType="org.example.membership.domain.order.Order">
         UPDATE orders
-        SET order_amount = #{orderAmount},
+        SET product_id = #{product.id},
+            coupon_id = #{coupon.id},
+            order_amount = #{orderAmount},
             status = #{status},
             ordered_at = #{orderedAt}
         WHERE id = #{id}
@@ -56,10 +64,11 @@
     </delete>
 
     <select id="sumOrderAmountByUserBetween" resultType="org.example.membership.dto.UserOrderTotal">
-        SELECT user_id      AS userId,
-               SUM(order_amount) AS totalAmount
-        FROM orders
-        WHERE ordered_at BETWEEN #{start} AND #{end}
-        GROUP BY user_id
+        SELECT o.user_id AS userId,
+               SUM(o.order_amount) AS totalAmount
+        FROM orders o
+                 JOIN products p ON o.product_id = p.id
+        WHERE o.ordered_at BETWEEN #{start} AND #{end}
+        GROUP BY o.user_id
     </select>
 </mapper> 

@@ -19,7 +19,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
 
     @Query("SELECT o.user.id, SUM(o.orderAmount) " +
-            "FROM Order o " +
+            "FROM Order o JOIN o.product p " +
             "WHERE o.orderedAt BETWEEN :start AND :end " +
             "GROUP BY o.user.id")
     List<Object[]> sumOrderAmountByUserBetween(

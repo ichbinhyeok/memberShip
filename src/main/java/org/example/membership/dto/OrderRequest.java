@@ -12,6 +12,8 @@ import java.time.LocalDateTime;
 public class OrderRequest {
     private Long id;
     private Long userId;
+    private Long productId;
+    private Long couponId;
     private BigDecimal orderAmount;
     private OrderStatus status = OrderStatus.PAID;        // 직접 지정
     private LocalDateTime orderedAt = LocalDateTime.now();

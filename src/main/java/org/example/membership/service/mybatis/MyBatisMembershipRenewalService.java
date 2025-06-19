@@ -44,7 +44,7 @@ public class MyBatisMembershipRenewalService {
         StopWatch watch = new StopWatch();
         watch.start();
 
-        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
+        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
 
         List<UserOrderTotal> aggregates = orderMapper.sumOrderAmountByUserBetween(
@@ -83,7 +83,7 @@ public class MyBatisMembershipRenewalService {
     }
 
     public void renewMembershipLevelForeach(LocalDate targetDate) {
-        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
+        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
 
         List<UserOrderTotal> aggregates = orderMapper.sumOrderAmountByUserBetween(
@@ -121,7 +121,7 @@ public class MyBatisMembershipRenewalService {
     public void renewMembershipLevelExecutorBatch(LocalDate targetDate) {
         int count = 0;
 
-        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
+        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
 
         List<UserOrderTotal> aggregates = orderMapper.sumOrderAmountByUserBetween(
@@ -239,7 +239,7 @@ public class MyBatisMembershipRenewalService {
     }
 
     public void renewMembershipLevelExecutorBatchWithBulkInsert(LocalDate targetDate) {
-        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
+        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
 
         List<UserOrderTotal> aggregates = orderMapper.sumOrderAmountByUserBetween(
@@ -295,7 +295,7 @@ public class MyBatisMembershipRenewalService {
 
 
     public void renewMembershipLevelCaseWhenInsertForeach(LocalDate targetDate) {
-        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
+        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
 
         List<UserOrderTotal> aggregates = orderMapper.sumOrderAmountByUserBetween(

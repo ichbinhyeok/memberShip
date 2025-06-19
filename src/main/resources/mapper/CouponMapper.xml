@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.membership.domain.coupon.mybatis.CouponMapper">
+    <resultMap id="couponResultMap" type="org.example.membership.domain.coupon.Coupon">
+        <id property="id" column="id"/>
+        <result property="code" column="code"/>
+        <result property="discountAmount" column="discount_amount"/>
+        <result property="expiresAt" column="expires_at"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="couponResultMap">
+        SELECT * FROM coupons
+    </select>
+
+    <select id="findById" resultMap="couponResultMap">
+        SELECT * FROM coupons WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="org.example.membership.domain.coupon.Coupon" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO coupons (code, discount_amount, expires_at)
+        VALUES (#{code}, #{discountAmount}, #{expiresAt})
+    </insert>
+
+    <update id="update" parameterType="org.example.membership.domain.coupon.Coupon">
+        UPDATE coupons SET code = #{code}, discount_amount = #{discountAmount}, expires_at = #{expiresAt}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM coupons WHERE id = #{id}
+    </delete>
+</mapper>

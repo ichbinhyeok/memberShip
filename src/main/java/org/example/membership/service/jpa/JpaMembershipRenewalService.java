@@ -36,7 +36,7 @@ public class JpaMembershipRenewalService {
         StopWatch watch = new StopWatch();
         watch.start(); // 시작 시간 기록
 
-        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1); // 5월 1일
+        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3); // 3월 1일
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);     // 5월 31일
 
         // 1. 유저별 전월 주문 금액 합계 조회
@@ -102,7 +102,7 @@ public class JpaMembershipRenewalService {
                 watch.getTotalTimeMillis());
     }
     public void renewMembershipLevelJpaUpdateInsertForeach(LocalDate targetDate) {
-        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(1);
+        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
 
         List<Object[]> aggregates = orderRepository.sumOrderAmountByUserBetween(
