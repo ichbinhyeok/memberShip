@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="org.example.membership.domain.coupon.mybatis.CouponMapper">
-    <resultMap id="couponResultMap" type="org.example.membership.domain.coupon.Coupon">
+<mapper namespace="org.example.membership.repository.mybatis.CouponMapper">
+
+    <resultMap id="couponResultMap" type="org.example.membership.entity.coupon.Coupon">
         <id property="id" column="id"/>
         <result property="code" column="code"/>
-        <result property="discountAmount" column="discount_amount"/>
+        <result property="discountAmount" column="discount_amount"
+                typeHandler="org.example.membership.common.mybatis.CouponAmountTypeHandler"/>
         <result property="expiresAt" column="expires_at"/>
+
+        <association property="category" javaType="org.example.membership.entity.category.Category">
+            <id property="id" column="category_id"/>
+        </association>
     </resultMap>
 
     <select id="findAll" resultMap="couponResultMap">
@@ -16,17 +22,28 @@
         SELECT * FROM coupons WHERE id = #{id}
     </select>
 
-    <insert id="insert" parameterType="org.example.membership.domain.coupon.Coupon" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO coupons (code, discount_amount, expires_at)
-        VALUES (#{code}, #{discountAmount}, #{expiresAt})
+    <insert id="insert" parameterType="org.example.membership.entity.coupon.Coupon"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO coupons (code, discount_amount, expires_at, category_id)
+        VALUES (
+                   #{code},
+                   #{discountAmount, typeHandler=org.example.membership.common.mybatis.CouponAmountTypeHandler},
+                   #{expiresAt},
+                   #{category.id}
+               )
     </insert>
 
-    <update id="update" parameterType="org.example.membership.domain.coupon.Coupon">
-        UPDATE coupons SET code = #{code}, discount_amount = #{discountAmount}, expires_at = #{expiresAt}
+    <update id="update" parameterType="org.example.membership.entity.coupon.Coupon">
+        UPDATE coupons
+        SET code = #{code},
+            discount_amount = #{discountAmount, typeHandler=org.example.membership.common.mybatis.CouponAmountTypeHandler},
+            expires_at = #{expiresAt},
+            category_id = #{category.id}
         WHERE id = #{id}
     </update>
 
     <delete id="deleteById">
         DELETE FROM coupons WHERE id = #{id}
     </delete>
+
 </mapper>

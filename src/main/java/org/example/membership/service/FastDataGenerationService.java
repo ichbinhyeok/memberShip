@@ -8,9 +8,7 @@ import javax.sql.DataSource;
 import java.math.BigDecimal;
 import java.sql.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 
@@ -24,6 +22,8 @@ public class FastDataGenerationService {
     private static final int ORDER_BATCH_SIZE = 100000;
     private static final int PRODUCT_BATCH_SIZE = 10000;
     private static final int COUPON_BATCH_SIZE = 10000;
+    private static final int CATEGORY_BATCH_SIZE = 1000;
+
 
     private static final String[] LAST_NAMES = {"김", "이", "박", "최", "정", "강", "조", "윤", "장", "임", "한", "오", "서", "신", "권", "황", "안", "송", "류", "전", "홍", "고", "문", "양", "손", "배", "조", "백", "허", "유"};
     private static final String[] FIRST_NAMES = {"민준", "서준", "예준", "도윤", "시우", "주원", "하준", "지호", "지후", "준서", "서진", "은우", "현우", "연우", "정우", "승우", "시원", "민재", "현준", "원준", "지원", "서현", "서윤", "지우", "하은", "민서", "윤서", "수아", "소율", "지안", "채원", "예원", "유나", "서아", "다은", "예은", "시은", "하린", "연서", "수빈", "영희", "철수", "영수", "순자", "미영", "정호", "승현", "태현", "진우", "상훈"};
@@ -60,8 +60,21 @@ public class FastDataGenerationService {
         log.info("🔄 주문 {}건씩 3,4,5월 생성 시작 (JDBC)", countPerMonth);
 
         List<Long> userIds = getAllUserIds();
-        List<Long> productIds = getAllProductIds();
-        List<Long> couponIds = getAllCouponIds();
+        List<Long> productIds = new ArrayList<>();
+        Map<Long, Long> productCategory = new HashMap<>();
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT id, category_id FROM products");
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                long id = rs.getLong("id");
+                productIds.add(id);
+                productCategory.put(id, (Long) rs.getObject("category_id"));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("상품 조회 실패", e);
+        }
+
+        Map<Long, List<Long>> couponsByCategory = getCouponIdsByCategory();
         if (userIds.isEmpty()) throw new IllegalStateException("유저가 없습니다.");
 
         try (Connection conn = dataSource.getConnection();
@@ -73,13 +86,17 @@ public class FastDataGenerationService {
             for (int month = 3; month <= 5; month++) {
                 for (int i = 0; i < countPerMonth; i++, total++) {
                     ps.setLong(1, userIds.get(rand.nextInt(userIds.size())));
+                    Long productId = null;
                     if (!productIds.isEmpty()) {
-                        ps.setLong(2, productIds.get(rand.nextInt(productIds.size())));
+                        productId = productIds.get(rand.nextInt(productIds.size()));
+                        ps.setLong(2, productId);
                     } else {
                         ps.setNull(2, Types.BIGINT);
                     }
-                    if (!couponIds.isEmpty() && rand.nextInt(10) < 2) {
-                        ps.setLong(3, couponIds.get(rand.nextInt(couponIds.size())));
+                    Long categoryId = productCategory.get(productId);
+                    java.util.List<Long> possibleCoupons = couponsByCategory.getOrDefault(categoryId, java.util.Collections.emptyList());
+                    if (!possibleCoupons.isEmpty() && rand.nextInt(10) < 2) {
+                        ps.setLong(3, possibleCoupons.get(rand.nextInt(possibleCoupons.size())));
                     } else {
                         ps.setNull(3, Types.BIGINT);
                     }
@@ -107,12 +124,19 @@ public class FastDataGenerationService {
 
     public void generateProducts(int count) {
         log.info("🔄 상품 {}건 생성 시작 (JDBC)", count);
+        List<Long> categoryIds = getAllCategoryIds();
+
         try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement("INSERT INTO products (name, price) VALUES (?, ?)") ) {
+             PreparedStatement ps = conn.prepareStatement("INSERT INTO products (name, price, category_id) VALUES (?, ?, ?)") ) {
             conn.setAutoCommit(false);
             for (int i = 0; i < count; i++) {
                 ps.setString(1, "상품" + (i + 1));
                 ps.setBigDecimal(2, generateRandomAmount());
+                if (!categoryIds.isEmpty()) {
+                    ps.setLong(3, categoryIds.get(ThreadLocalRandom.current().nextInt(categoryIds.size())));
+                } else {
+                    ps.setNull(3, Types.BIGINT);
+                }
                 ps.addBatch();
                 if (i % PRODUCT_BATCH_SIZE == 0) {
                     ps.executeBatch();
@@ -127,15 +151,41 @@ public class FastDataGenerationService {
         }
     }
 
+    public void generateCategories(int count) {
+        log.info("🔄 카테고리 {}건 생성 시작 (JDBC)", count);
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement("INSERT INTO categories(name) VALUES (?)")) {
+            conn.setAutoCommit(false);
+            for (int i = 0; i < count; i++) {
+                ps.setString(1, "카테고리" + (i + 1));
+                ps.addBatch();
+                if (i % CATEGORY_BATCH_SIZE == 0) {
+                    ps.executeBatch();
+                    ps.clearBatch();
+                    log.info("✅ 카테고리 진행률: {}/{}", i + 1, count);
+                }
+            }
+            ps.executeBatch();
+            conn.commit();
+        } catch (SQLException e) {
+            throw new RuntimeException("카테고리 배치 삽입 실패", e);
+        }
+    }
     public void generateCoupons(int count) {
         log.info("🔄 쿠폰 {}건 생성 시작 (JDBC)", count);
+        List<Long> categoryIds = getAllCategoryIds();
         try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement("INSERT INTO coupons (code, discount_amount, expires_at) VALUES (?, ?, ?)") ) {
+             PreparedStatement ps = conn.prepareStatement("INSERT INTO coupons (code, discount_amount, expires_at, category_id) VALUES (?, ?, ?, ?)") ) {
             conn.setAutoCommit(false);
             for (int i = 0; i < count; i++) {
                 ps.setString(1, "COUPON" + (i + 1));
                 ps.setBigDecimal(2, BigDecimal.valueOf(1000));
                 ps.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now().plusDays(30)));
+                if (!categoryIds.isEmpty()) {
+                    ps.setLong(4, categoryIds.get(ThreadLocalRandom.current().nextInt(categoryIds.size())));
+                } else {
+                    ps.setNull(4, Types.BIGINT);
+                }
                 ps.addBatch();
                 if (i % COUPON_BATCH_SIZE == 0) {
                     ps.executeBatch();
@@ -206,6 +256,34 @@ public class FastDataGenerationService {
         return ids;
     }
 
+    private List<Long> getAllCategoryIds() {
+        List<Long> ids = new ArrayList<>();
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT id FROM categories");
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                ids.add(rs.getLong("id"));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("카테고리 ID 조회 실패", e);
+        }
+        return ids;
+    }
+
+    private Map<Long, List<Long>> getCouponIdsByCategory() {
+        Map<Long, List<Long>> map = new java.util.HashMap<>();
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT id, category_id FROM coupons");
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Long catId = (Long) rs.getObject("category_id");
+                map.computeIfAbsent(catId, k -> new ArrayList<>()).add(rs.getLong("id"));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("쿠폰 조회 실패", e);
+        }
+        return map;
+    }
 
     private LocalDateTime generateRandomDate(int year, int month) {
         int lastDay = java.time.YearMonth.of(year, month).lengthOfMonth();

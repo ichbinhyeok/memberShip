@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
-import org.example.membership.domain.user.User;
+import org.example.membership.entity.User;
 
 import java.time.LocalDateTime;
 

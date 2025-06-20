@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.membership.entity.orderitem.mybatis.OrderItemMapper">
+    <resultMap id="orderItemResultMap" type="org.example.membership.entity.orderitem.OrderItem">
+        <id property="id" column="id"/>
+        <result property="quantity" column="quantity"/>
+        <association property="order" javaType="org.example.membership.entity.order.Order">
+            <id property="id" column="order_id"/>
+        </association>
+        <association property="product" javaType="org.example.membership.entity.Product">
+            <id property="id" column="product_id"/>
+        </association>
+    </resultMap>
+
+    <select id="findAll" resultMap="orderItemResultMap">
+        SELECT * FROM order_items
+    </select>
+
+    <select id="findById" resultMap="orderItemResultMap">
+        SELECT * FROM order_items WHERE id = #{id}
+    </select>
+
+    <select id="findByOrderId" resultMap="orderItemResultMap">
+        SELECT * FROM order_items WHERE order_id = #{orderId}
+    </select>
+
+    <insert id="insert" parameterType="org.example.membership.entity.orderitem.OrderItem" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO order_items (order_id, product_id, quantity)
+        VALUES (#{order.id}, #{product.id}, #{quantity})
+    </insert>
+
+    <update id="update" parameterType="org.example.membership.entity.orderitem.OrderItem">
+        UPDATE order_items SET
+                               order_id = #{order.id},
+                               product_id = #{product.id},
+                               quantity = #{quantity}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM order_items WHERE id = #{id}
+    </delete>
+</mapper>

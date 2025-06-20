@@ -24,4 +24,22 @@ public class FastDataGenerationController {
         fastDataGenerationService.generateOrders(count);
         return ResponseEntity.ok(count + "건 주문 생성 완료");
     }
+
+    @PostMapping("/categories/{count}")
+    public ResponseEntity<String> generateCategories(@PathVariable("count") int count) {
+        fastDataGenerationService.generateCategories(count);
+        return ResponseEntity.ok(count + "개 카테고리 생성 완료");
+    }
+
+    @PostMapping("/products/{count}")
+    public ResponseEntity<String> generateProducts(@PathVariable("count") int count) {
+        fastDataGenerationService.generateProducts(count);
+        return ResponseEntity.ok(count + "개 상품 생성 완료");
+    }
+
+    @PostMapping("/coupons/{count}")
+    public ResponseEntity<String> generateCoupons(@PathVariable("count") int count) {
+        fastDataGenerationService.generateCoupons(count);
+        return ResponseEntity.ok(count + "개 쿠폰 생성 완료");
+    }
 }

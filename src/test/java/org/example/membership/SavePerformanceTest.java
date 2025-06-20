@@ -1,7 +1,7 @@
 package org.example.membership;
 
-import org.example.membership.domain.user.User;
-import org.example.membership.domain.user.jpa.UserRepository;
+import org.example.membership.entity.User;
+import org.example.membership.repository.jpa.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

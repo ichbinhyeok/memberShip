@@ -1,8 +1,8 @@
 package org.example.membership.service.mybatis;
 
 import lombok.RequiredArgsConstructor;
-import org.example.membership.domain.order.Order;
-import org.example.membership.domain.order.mybatis.OrderMapper;
+import org.example.membership.entity.Order;
+import org.example.membership.repository.mybatis.OrderMapper;
 import org.example.membership.common.enums.OrderStatus;
 import org.example.membership.dto.OrderRequest;
 import org.springframework.stereotype.Service;

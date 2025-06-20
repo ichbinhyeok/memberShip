@@ -2,8 +2,8 @@ package org.example.membership.service.mybatis;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
-import org.example.membership.domain.user.User;
-import org.example.membership.domain.user.mybatis.UserMapper;
+import org.example.membership.entity.User;
+import org.example.membership.repository.mybatis.UserMapper;
 import org.example.membership.dto.CreateUserRequest;
 import org.example.membership.dto.MembershipInfoResponse;
 import org.example.membership.exception.NotFoundException;
@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor

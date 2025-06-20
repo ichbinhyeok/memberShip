@@ -6,11 +6,15 @@ import org.apache.ibatis.session.ExecutorType;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.example.membership.common.enums.MembershipLevel;
-import org.example.membership.domain.log.MembershipLog;
-import org.example.membership.domain.log.mybatis.MembershipLogMapper;
-import org.example.membership.domain.order.mybatis.OrderMapper;
-import org.example.membership.domain.user.User;
-import org.example.membership.domain.user.mybatis.UserMapper;
+import org.example.membership.dto.UserCategoryOrderStats;
+import org.example.membership.entity.Badge;
+import org.example.membership.entity.MembershipLog;
+import org.example.membership.repository.jpa.BadgeRepository;
+import org.example.membership.repository.jpa.CategoryRepository;
+import org.example.membership.repository.mybatis.MembershipLogMapper;
+import org.example.membership.repository.mybatis.OrderMapper;
+import org.example.membership.entity.User;
+import org.example.membership.repository.mybatis.UserMapper;
 import org.example.membership.dto.MembershipLogRequest;
 import org.example.membership.dto.UserOrderTotal;
 import org.springframework.stereotype.Service;
@@ -34,6 +38,8 @@ public class MyBatisMembershipRenewalService {
     private final OrderMapper orderMapper;
     private final MembershipLogMapper membershipLogMapper;
     private final SqlSessionFactory sqlSessionFactory;
+    private final CategoryRepository categoryRepository;
+    private final BadgeRepository badgeRepository;
 
     private static final int BATCH_SIZE = 5000;
 
@@ -46,22 +52,41 @@ public class MyBatisMembershipRenewalService {
 
         LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
-
-        List<UserOrderTotal> aggregates = orderMapper.sumOrderAmountByUserBetween(
+        List<UserCategoryOrderStats> aggregates = orderMapper.aggregateByUserAndCategoryBetween(
                 startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX)
         );
 
-        Map<Long, BigDecimal> totalAmountByUser = aggregates.stream()
-                .collect(Collectors.toMap(UserOrderTotal::getUserId, UserOrderTotal::getTotalAmount));
-
+        class Stats { long count; BigDecimal amount; Stats(long c, BigDecimal a){count=c; amount=a;} }
+        Map<Long, Map<Long, Stats>> statMap = new java.util.HashMap<>();
+        for (org.example.membership.dto.UserCategoryOrderStats row : aggregates) {
+            statMap.computeIfAbsent(row.getUserId(), k -> new java.util.HashMap<>())
+                    .put(row.getCategoryId(), new Stats(row.getOrderCount(), row.getTotalAmount()));
+        }
         List<User> users = userMapper.findAll();
 
         for (User user : users) {
-            Long userId = user.getId();
-            BigDecimal totalAmount = totalAmountByUser.getOrDefault(userId, BigDecimal.ZERO);
+            Map<Long, Stats> userStats = statMap.getOrDefault(user.getId(), java.util.Collections.emptyMap());
+            long existingBadgeCount = badgeRepository.countByUser(user);
+            int newBadgeCount = 0;
+            for (Map.Entry<Long, Stats> e : userStats.entrySet()) {
+                Stats s = e.getValue();
+                if (s.count >= 10 && s.amount.compareTo(new BigDecimal("300000")) >= 0) {
+                    var category = categoryRepository.getReferenceById(e.getKey());
+                    if (!badgeRepository.existsByUserAndCategory(user, category)) {
+                        Badge badge = new Badge();
+                        badge.setUser(user);
+                        badge.setCategory(category);
+                        badge.setAwardedAt(LocalDateTime.now());
+                        badgeRepository.save(badge);
+                        newBadgeCount++;
+                    }
+                }
+            }
+            long badgeCount = existingBadgeCount + newBadgeCount;
+
 
             MembershipLevel oldLevel = user.getMembershipLevel();
-            MembershipLevel newLevel = calculateLevel(totalAmount);
+            MembershipLevel newLevel = calculateLevel(badgeCount);
 
             user.setMembershipLevel(newLevel);
             user.setLastMembershipChange(LocalDateTime.now());
@@ -71,7 +96,7 @@ public class MyBatisMembershipRenewalService {
             log.setUser(user);
             log.setPreviousLevel(oldLevel);
             log.setNewLevel(newLevel);
-            log.setChangeReason(getReason(oldLevel, newLevel, totalAmount));
+            log.setChangeReason("badge count: " + badgeCount);
             log.setChangedAt(LocalDateTime.now());
 
             membershipLogMapper.insert(log);
@@ -230,7 +255,7 @@ public class MyBatisMembershipRenewalService {
      */
     private String getReason(MembershipLevel oldLevel, MembershipLevel newLevel, BigDecimal amount) {
         if (newLevel.ordinal() > oldLevel.ordinal()) {
-            return "자동 강득 (전원 주문합계: " + amount + ")";
+            return "자동 강등 (전원 주문합계: " + amount + ")";
         } else if (newLevel.ordinal() < oldLevel.ordinal()) {
             return "자동 승급 (전원 주문합계: " + amount + ")";
         } else {
@@ -335,6 +360,17 @@ public class MyBatisMembershipRenewalService {
 
         // 2. insert: foreach multi-row SQL
         membershipLogMapper.bulkInsertRequests(logs);
+    }
+
+    private MembershipLevel calculateLevel(long badgeCount) {
+        if (badgeCount >= 3) {
+            return MembershipLevel.VIP;
+        } else if (badgeCount == 2) {
+            return MembershipLevel.GOLD;
+        } else if (badgeCount >= 1) {
+            return MembershipLevel.SILVER;
+        }
+        return MembershipLevel.SILVER;
     }
 
 }

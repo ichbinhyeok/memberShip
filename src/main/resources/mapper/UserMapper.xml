@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="org.example.membership.domain.user.mybatis.UserMapper">
-    <resultMap id="userResultMap" type="org.example.membership.domain.user.User">
+<mapper namespace="org.example.membership.repository.mybatis.UserMapper">
+    <resultMap id="userResultMap" type="org.example.membership.entity.User">
         <id property="id" column="id"/>
         <result property="userId" column="user_id"/>
         <result property="name" column="name"/>
@@ -39,7 +39,7 @@
     </select>
 
 
-    <insert id="insert" parameterType="org.example.membership.domain.user.User" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="org.example.membership.entity.User" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO users (
             name,
             membership_level,
@@ -53,7 +53,7 @@
         )
     </insert>
 
-    <update id="update" parameterType="org.example.membership.domain.user.User">
+    <update id="update" parameterType="org.example.membership.entity.User">
         UPDATE users
         SET membership_level = #{membershipLevel},
             last_membership_change = #{lastMembershipChange}

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="org.example.membership.domain.order.mybatis.OrderMapper">
+<mapper namespace="org.example.membership.repository.mybatis.OrderMapper">
 
     <resultMap id="orderResultMap" type="org.example.membership.dto.OrderResponse">
         <id property="id" column="id"/>
@@ -49,7 +49,7 @@
         SELECT * FROM orders WHERE user_id = #{userId} ORDER BY ordered_at DESC
     </select>
 
-    <update id="update" parameterType="org.example.membership.domain.order.Order">
+    <update id="update" parameterType="org.example.membership.entity.Order">
         UPDATE orders
         SET product_id = #{product.id},
             coupon_id = #{coupon.id},
@@ -65,10 +65,25 @@
 
     <select id="sumOrderAmountByUserBetween" resultType="org.example.membership.dto.UserOrderTotal">
         SELECT o.user_id AS userId,
-               SUM(o.order_amount) AS totalAmount
+               SUM(o.order_amount - IFNULL(c.discount_amount,0)) AS totalAmount
         FROM orders o
                  JOIN products p ON o.product_id = p.id
-        WHERE o.ordered_at BETWEEN #{start} AND #{end}
+                 LEFT JOIN coupons c ON o.coupon_id = c.id
+        WHERE o.status = 'PAID'
+          AND o.ordered_at BETWEEN #{start} AND #{end}
         GROUP BY o.user_id
+    </select>
+
+    <select id="aggregateByUserAndCategoryBetween" resultType="org.example.membership.dto.UserCategoryOrderStats">
+        SELECT o.user_id AS userId,
+               p.category_id AS categoryId,
+               COUNT(o.id) AS orderCount,
+               SUM(o.order_amount - IFNULL(c.discount_amount,0)) AS totalAmount
+        FROM orders o
+                 JOIN products p ON o.product_id = p.id
+                 LEFT JOIN coupons c ON o.coupon_id = c.id
+        WHERE o.status = 'PAID'
+          AND o.ordered_at BETWEEN #{start} AND #{end}
+        GROUP BY o.user_id, p.category_id
     </select>
 </mapper> 

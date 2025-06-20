@@ -2,17 +2,15 @@ package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
-import org.example.membership.domain.user.User;
-import org.example.membership.domain.user.jpa.UserRepository;
+import org.example.membership.entity.User;
+import org.example.membership.repository.jpa.UserRepository;
 import org.example.membership.dto.CreateUserRequest;
 import org.example.membership.dto.MembershipInfoResponse;
 import org.example.membership.exception.NotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor

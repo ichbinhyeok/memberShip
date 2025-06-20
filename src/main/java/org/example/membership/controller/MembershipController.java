@@ -8,15 +8,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.membership.domain.log.MembershipLog;
-import org.example.membership.domain.log.jdbc.JdbcMembershipLogRepository;
-import org.example.membership.domain.user.User;
-import org.example.membership.domain.user.jpa.UserRepository;
+import org.example.membership.entity.User;
+import org.example.membership.repository.jpa.UserRepository;
 import org.example.membership.dto.CreateUserRequest;
 import org.example.membership.dto.MembershipInfoResponse;
-import org.example.membership.dto.MembershipLogRequest;
 import org.example.membership.dto.UserResponse;
-import org.example.membership.service.jdbc.JdbcMembershipRenewalService;
 import org.example.membership.service.jpa.JpaMembershipRenewalService;
 import org.example.membership.service.jpa.JpaMembershipService;
 import org.example.membership.service.mybatis.MyBatisMembershipRenewalService;
@@ -27,8 +23,6 @@ import org.springframework.util.StopWatch;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Map;
 
 @Tag(name = "멤버십 관리", description = "멤버십 관련 API")
@@ -41,9 +35,7 @@ public class MembershipController {
     private final MyBatisMembershipService myBatisMembershipService;
     private final JpaMembershipRenewalService jpaMembershipRenewalService;
     private final MyBatisMembershipRenewalService myBatisMembershipRenewalService;
-    private final JdbcMembershipLogRepository jdbcMembershipLogRepository;
     private final UserRepository userRepository;
-    private final JdbcMembershipRenewalService jdbcMembershipRenewalService;
 
     @Operation(summary = "JPA로 사용자 멤버십 조회", description = "사용자 ID로 JPA를 사용하여 멤버십 정보를 조회합니다.")
     @ApiResponses(value = {
@@ -163,28 +155,7 @@ public class MembershipController {
         return ResponseEntity.ok().build();
     }
 
-    @Operation(
-            summary = "등급 자동 갱신 + 로그 저장 (JDBC 배치)",
-            description = "결제 집계 데이터를 기반으로 회원 등급을 계산하고, 사용자 등급을 업데이트하며 로그를 배치 저장합니다."
-    )
-    @PostMapping("/jdbc/renew")
-    public ResponseEntity<Map<String, Object>> renewAndInsertMembershipLogs(
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate targetDate
-    ) {
-        if (targetDate == null) {
-            targetDate = LocalDate.now();
-        }
 
-        // 핵심: 여기서 계산 + 업데이트 + insert 다 수행
-        jdbcMembershipRenewalService.renewMembershipLevel(LocalDate.of(2025, 6, 1));
-
-        return ResponseEntity.ok(Map.of(
-                "message", "등급 갱신 및 로그 저장 완료",
-                "targetDate", targetDate
-        ));
-    }
 
 
     @PostMapping("/renew/mybatis/combined-batch")

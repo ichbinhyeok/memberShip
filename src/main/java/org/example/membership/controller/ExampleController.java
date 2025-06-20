@@ -10,8 +10,8 @@ import org.apache.ibatis.session.ExecutorType;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.example.membership.common.enums.MembershipLevel;
-import org.example.membership.domain.user.User;
-import org.example.membership.domain.user.mybatis.UserMapper;
+import org.example.membership.entity.User;
+import org.example.membership.repository.mybatis.UserMapper;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
