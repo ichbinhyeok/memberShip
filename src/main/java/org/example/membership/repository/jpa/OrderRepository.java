@@ -19,19 +19,23 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByUser_Id(Long userId);
 
 
-    @Query("SELECT o.user.id, SUM(o.orderAmount - COALESCE(c.discountAmount,0)) " +
-            "FROM Order o JOIN o.product p LEFT JOIN o.coupon c " +
-            "WHERE o.status = 'PAID' AND o.orderedAt BETWEEN :start AND :end " +
-            "GROUP BY o.user.id")
+    @Query(value = "SELECT o.user_id, SUM(o.order_amount - IFNULL(c.discount_amount,0)) " +
+            "FROM orders o " +
+            "JOIN products p ON o.product_id = p.id " +
+            "LEFT JOIN coupons c ON o.coupon_id = c.id " +
+            "WHERE o.status = 'PAID' AND o.ordered_at BETWEEN :start AND :end " +
+            "GROUP BY o.user_id", nativeQuery = true)
     List<Object[]> sumOrderAmountByUserBetween(
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
 
-    @Query("SELECT o.user.id, o.product.category.id, COUNT(o), SUM(o.orderAmount - COALESCE(c.discountAmount,0)) " +
-            "FROM Order o LEFT JOIN o.coupon c " +
-            "WHERE o.status = 'PAID' AND o.orderedAt BETWEEN :start AND :end " +
-            "GROUP BY o.user.id, o.product.category.id")
+    @Query(value = "SELECT o.user_id, p.category_id, COUNT(o.id), SUM(o.order_amount - IFNULL(c.discount_amount,0)) " +
+            "FROM orders o " +
+            "JOIN products p ON o.product_id = p.id " +
+            "LEFT JOIN coupons c ON o.coupon_id = c.id " +
+            "WHERE o.status = 'PAID' AND o.ordered_at BETWEEN :start AND :end " +
+            "GROUP BY o.user_id, p.category_id", nativeQuery = true)
     List<Object[]> aggregateByUserAndCategoryBetween(
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end

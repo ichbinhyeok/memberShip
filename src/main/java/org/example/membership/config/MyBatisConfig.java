@@ -12,9 +12,7 @@ import javax.sql.DataSource;
 
 @Configuration
 @MapperScan(basePackages = {
-        "org.example.membership.entity.log.mybatis",
-        "org.example.membership.entity.user.mybatis",
-        "org.example.membership.entity.order.mybatis"
+        "org.example.membership.repository.mybatis"
 })
 public class MyBatisConfig {
 

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="org.example.membership.entity.orderitem.mybatis.OrderItemMapper">
-    <resultMap id="orderItemResultMap" type="org.example.membership.entity.orderitem.OrderItem">
+<mapper namespace="org.example.membership.entity.OrderItemMapper">
+    <resultMap id="orderItemResultMap" type="org.example.membership.entity.OrderItem">
         <id property="id" column="id"/>
         <result property="quantity" column="quantity"/>
-        <association property="order" javaType="org.example.membership.entity.order.Order">
+        <association property="order" javaType="org.example.membership.entity.Order">
             <id property="id" column="order_id"/>
         </association>
         <association property="product" javaType="org.example.membership.entity.Product">
@@ -24,12 +24,12 @@
         SELECT * FROM order_items WHERE order_id = #{orderId}
     </select>
 
-    <insert id="insert" parameterType="org.example.membership.entity.orderitem.OrderItem" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="org.example.membership.entity.OrderItem" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO order_items (order_id, product_id, quantity)
         VALUES (#{order.id}, #{product.id}, #{quantity})
     </insert>
 
-    <update id="update" parameterType="org.example.membership.entity.orderitem.OrderItem">
+    <update id="update" parameterType="org.example.membership.entity.OrderItem">
         UPDATE order_items SET
                                order_id = #{order.id},
                                product_id = #{product.id},
