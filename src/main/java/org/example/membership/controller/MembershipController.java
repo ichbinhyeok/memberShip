@@ -188,5 +188,15 @@ public class MembershipController {
         return ResponseEntity.ok().build();
     }
 
+    @GetMapping("/{id}/status")
+    public ResponseEntity<org.example.membership.dto.UserStatusResponse> getStatus(@PathVariable("id") Long userId) {
+        return ResponseEntity.ok(jpaMembershipService.getUserStatus(userId));
+    }
+
+    @GetMapping("/{id}/coupons")
+    public ResponseEntity<java.util.List<org.example.membership.dto.CouponInfoResponse>> getCoupons(@PathVariable("id") Long userId) {
+        return ResponseEntity.ok(jpaMembershipService.getUserCoupons(userId));
+    }
+
 
 } 
