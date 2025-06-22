@@ -11,4 +11,5 @@ import org.springframework.stereotype.Repository;
 public interface BadgeRepository extends JpaRepository<Badge, Long> {
     boolean existsByUserAndCategory(User user, Category category);
     long countByUser(User user);
+    java.util.List<Badge> findByUser(User user);
 }

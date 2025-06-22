@@ -16,6 +16,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JpaMembershipService {
     private final UserRepository userRepository;
+    private final org.example.membership.repository.jpa.BadgeRepository badgeRepository;
+    private final org.example.membership.repository.jpa.CouponIssueLogRepository couponIssueLogRepository;
 
     @Transactional
     public User createUser(CreateUserRequest request) {
@@ -64,4 +66,32 @@ public class JpaMembershipService {
     public List<User> getUsersByMembershipLevel(MembershipLevel level) {
         return userRepository.findByMembershipLevel(level);
     }
-} 
+
+    @Transactional(readOnly = true)
+    public org.example.membership.dto.UserStatusResponse getUserStatus(Long userId) {
+        User user = getUserById(userId);
+        org.example.membership.dto.UserStatusResponse resp = new org.example.membership.dto.UserStatusResponse();
+        resp.setUserId(user.getId());
+        resp.setMembershipLevel(user.getMembershipLevel());
+        java.util.List<String> badges = badgeRepository.findByUser(user).stream()
+                .map(b -> b.getCategory().getName().name())
+                .toList();
+        resp.setBadges(badges);
+        return resp;
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<org.example.membership.dto.CouponInfoResponse> getUserCoupons(Long userId) {
+        User user = getUserById(userId);
+        return couponIssueLogRepository.findByUser(user).stream().map(log -> {
+            org.example.membership.dto.CouponInfoResponse dto = new org.example.membership.dto.CouponInfoResponse();
+            dto.setId(log.getCoupon().getId());
+            dto.setCode(log.getCoupon().getCode());
+            if (log.getCoupon().getCategory() != null) {
+                dto.setCategory(log.getCoupon().getCategory().getName().name());
+            }
+            dto.setExpiresAt(log.getCoupon().getExpiresAt());
+            return dto;
+        }).toList();
+    }
+}

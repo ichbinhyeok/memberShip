@@ -7,6 +7,8 @@ import org.example.membership.dto.MembershipLogRequest;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.MembershipLog;
 import org.example.membership.entity.User;
+import org.example.membership.entity.Coupon;
+import org.example.membership.entity.CouponIssueLog;
 import org.example.membership.repository.jpa.*;
 import org.example.membership.repository.mybatis.MembershipLogMapper;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,8 @@ public class JpaMembershipRenewalService {
     private final MembershipLogMapper membershipLogMapper;
     private final CategoryRepository categoryRepository;
     private final BadgeRepository badgeRepository;
+    private final CouponRepository couponRepository;
+    private final CouponIssueLogRepository couponIssueLogRepository;
 
     public void renewMembershipLevel(LocalDate targetDate) {
         StopWatch watch = new StopWatch();
@@ -65,17 +69,28 @@ public class JpaMembershipRenewalService {
         List<User> updatedUsers = new ArrayList<>();
         List<MembershipLog> logs = new ArrayList<>();
         List<Badge> newBadges = new ArrayList<>();
+        List<Badge> removeBadges = new ArrayList<>();
+        List<Coupon> coupons = new ArrayList<>();
+        List<CouponIssueLog> issueLogs = new ArrayList<>();
 
         LocalDateTime now = LocalDateTime.now();
 
         for (User user : users) {
             Map<Long, Stats> userStats = statMap.getOrDefault(user.getId(), java.util.Collections.emptyMap());
 
-            long existingBadgeCount = badgeRepository.countByUser(user);
+            List<Badge> currentBadges = badgeRepository.findByUser(user);
             int newBadgeCount = 0;
+
+            for (Badge b : currentBadges) {
+                Stats s = userStats.get(b.getCategory().getId());
+                if (s == null || s.count < 5 || s.amount.compareTo(new BigDecimal("300000")) < 0) {
+                    removeBadges.add(b);
+                }
+            }
+
             for (Map.Entry<Long, Stats> e : userStats.entrySet()) {
                 Stats s = e.getValue();
-                if (s.count >= 10 && s.amount.compareTo(new BigDecimal("300000")) >= 0) {
+                if (s.count >= 5 && s.amount.compareTo(new BigDecimal("300000")) >= 0) {
                     var category = categoryRepository.getReferenceById(e.getKey());
                     if (!badgeRepository.existsByUserAndCategory(user, category)) {
                         Badge badge = new Badge();
@@ -88,7 +103,7 @@ public class JpaMembershipRenewalService {
                 }
             }
 
-            long badgeCount = existingBadgeCount + newBadgeCount;
+            long badgeCount = currentBadges.size() - removeBadges.size() + newBadgeCount;
             MembershipLevel oldLevel = user.getMembershipLevel();
             MembershipLevel newLevel = calculateLevel(badgeCount);
 
@@ -103,11 +118,43 @@ public class JpaMembershipRenewalService {
             log.setChangeReason("badge count: " + badgeCount);
             log.setChangedAt(now);
             logs.add(log);
+
+            int couponQty = switch (newLevel) {
+                case VIP -> 3;
+                case GOLD -> 2;
+                case SILVER -> 1;
+                default -> 0;
+            };
+
+            if (couponQty > 0) {
+                List<Badge> finalBadges = new java.util.ArrayList<>(currentBadges);
+                finalBadges.removeAll(removeBadges);
+                finalBadges.addAll(newBadges);
+                for (Badge b : finalBadges) {
+                    for (int i = 0; i < couponQty; i++) {
+                        Coupon c = new Coupon();
+                        c.setCode("AUTO-" + java.util.UUID.randomUUID().toString().substring(0,8));
+                        c.setDiscountAmount(org.example.membership.common.enums.CouponAmount.W1000);
+                        c.setCategory(b.getCategory());
+                        coupons.add(c);
+
+                        CouponIssueLog logEntry = new CouponIssueLog();
+                        logEntry.setUser(user);
+                        logEntry.setCoupon(c);
+                        logEntry.setMembershipLevel(newLevel);
+                        logEntry.setIssuedAt(now);
+                        issueLogs.add(logEntry);
+                    }
+                }
+            }
         }
 
+        badgeRepository.deleteAll(removeBadges);
         badgeRepository.saveAll(newBadges);
         userRepository.saveAll(updatedUsers);
         membershipLogRepository.saveAll(logs);
+        couponRepository.saveAll(coupons);
+        couponIssueLogRepository.saveAll(issueLogs);
 
         watch.stop(); // 종료 시간 기록
         log.info("✅ 등급 갱신 배치 완료 - 처리 유저 수: {}, 총 소요 시간: {} ms",
@@ -138,16 +185,26 @@ public class JpaMembershipRenewalService {
         List<User> updatedUsers = new ArrayList<>();
         List<MembershipLogRequest> logs = new ArrayList<>();
         List<Badge> newBadges = new ArrayList<>();
+        List<Badge> removeBadges = new ArrayList<>();
+        List<Coupon> coupons = new ArrayList<>();
+        List<CouponIssueLog> issueLogs = new ArrayList<>();
 
         LocalDateTime now = LocalDateTime.now();
 
         for (User user : users) {
             Map<Long, Stats> userStats = statMap.getOrDefault(user.getId(), java.util.Collections.emptyMap());
-            long existingBadgeCount = badgeRepository.countByUser(user);
+            List<Badge> currentBadges = badgeRepository.findByUser(user);
             int newBadgeCount = 0;
+            for (Badge b : currentBadges) {
+                Stats s = userStats.get(b.getCategory().getId());
+                if (s == null || s.count < 5 || s.amount.compareTo(new BigDecimal("300000")) < 0) {
+                    removeBadges.add(b);
+                }
+            }
+
             for (Map.Entry<Long, Stats> e : userStats.entrySet()) {
                 Stats s = e.getValue();
-                if (s.count >= 10 && s.amount.compareTo(new BigDecimal("300000")) >= 0) {
+                if (s.count >= 5 && s.amount.compareTo(new BigDecimal("300000")) >= 0) {
                     var category = categoryRepository.getReferenceById(e.getKey());
                     if (!badgeRepository.existsByUserAndCategory(user, category)) {
                         Badge badge = new Badge();
@@ -160,7 +217,7 @@ public class JpaMembershipRenewalService {
                 }
             }
 
-            long badgeCount = existingBadgeCount + newBadgeCount;
+            long badgeCount = currentBadges.size() - removeBadges.size() + newBadgeCount;
             MembershipLevel oldLevel = user.getMembershipLevel();
             MembershipLevel newLevel = calculateLevel(badgeCount);
 
@@ -175,11 +232,41 @@ public class JpaMembershipRenewalService {
             logReq.setChangeReason("badge count: " + badgeCount);
             logReq.setChangedAt(now);
             logs.add(logReq);
-        }
 
+            int couponQty = switch (newLevel) {
+                case VIP -> 3;
+                case GOLD -> 2;
+                case SILVER -> 1;
+                default -> 0;
+            };
+            if (couponQty > 0) {
+                List<Badge> finalBadges = new java.util.ArrayList<>(currentBadges);
+                finalBadges.removeAll(removeBadges);
+                finalBadges.addAll(newBadges);
+                for (Badge b : finalBadges) {
+                    for (int i = 0; i < couponQty; i++) {
+                        Coupon c = new Coupon();
+                        c.setCode("AUTO-" + java.util.UUID.randomUUID().toString().substring(0,8));
+                        c.setDiscountAmount(org.example.membership.common.enums.CouponAmount.W1000);
+                        c.setCategory(b.getCategory());
+                        coupons.add(c);
+
+                        CouponIssueLog entry = new CouponIssueLog();
+                        entry.setUser(user);
+                        entry.setCoupon(c);
+                        entry.setMembershipLevel(newLevel);
+                        entry.setIssuedAt(now);
+                        issueLogs.add(entry);
+                    }
+                }
+            }
+        }
+        badgeRepository.deleteAll(removeBadges);
         badgeRepository.saveAll(newBadges);
         userRepository.saveAll(updatedUsers);
         membershipLogMapper.bulkInsertRequests(logs);
+        couponRepository.saveAll(coupons);
+        couponIssueLogRepository.saveAll(issueLogs);
     }
 
     private MembershipLevel calculateLevel(long badgeCount) {
@@ -187,10 +274,10 @@ public class JpaMembershipRenewalService {
             return MembershipLevel.VIP;
         } else if (badgeCount == 2) {
             return MembershipLevel.GOLD;
-        } else if (badgeCount >= 1) {
+        } else if (badgeCount == 1) {
             return MembershipLevel.SILVER;
         }
-        return MembershipLevel.SILVER;
+        return MembershipLevel.NONE;
     }
 
 

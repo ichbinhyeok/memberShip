@@ -45,7 +45,7 @@ public class ExampleController {
             for (int i = 0; i < 10000; i++) {
                 User user = new User();
                 user.setName("test-user-" + i);
-                user.setMembershipLevel(MembershipLevel.SILVER);
+                user.setMembershipLevel(MembershipLevel.NONE);
                 user.setCreatedAt(LocalDateTime.now());
                 mapper.insert(user); // 반드시 insert만 테스트
             }

@@ -18,6 +18,6 @@ public class CreateUserRequest {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private MembershipLevel membershipLevel = MembershipLevel.SILVER;
+    private MembershipLevel membershipLevel = MembershipLevel.NONE;
 
 }

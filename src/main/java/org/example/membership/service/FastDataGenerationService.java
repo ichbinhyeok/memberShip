@@ -36,7 +36,7 @@ public class FastDataGenerationService {
 
             for (int i = 0; i < count; i++) {
                 ps.setString(1, generateRandomName());
-                ps.setString(2, "SILVER");
+                ps.setString(2, "NONE");
                 ps.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now().minusDays(ThreadLocalRandom.current().nextInt(30))));
                 ps.addBatch();
 

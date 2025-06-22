@@ -367,10 +367,10 @@ public class MyBatisMembershipRenewalService {
             return MembershipLevel.VIP;
         } else if (badgeCount == 2) {
             return MembershipLevel.GOLD;
-        } else if (badgeCount >= 1) {
+        } else if (badgeCount == 1) {
             return MembershipLevel.SILVER;
         }
-        return MembershipLevel.SILVER;
+        return MembershipLevel.NONE;
     }
 
 }
