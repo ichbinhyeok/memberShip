@@ -1,5 +1,6 @@
 package org.example.membership.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.example.membership.service.MixedMembershipService;
 import org.example.membership.service.jpa.JpaMembershipRenewalService;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 
+@Tag(name = "Membership Renewal", description = "등급 갱신 운영 API")
 @RestController
 @RequestMapping("/renewal")
 @RequiredArgsConstructor
