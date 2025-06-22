@@ -2,7 +2,6 @@ package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
-import org.example.membership.dto.CouponInfoResponse;
 import org.example.membership.entity.User;
 import org.example.membership.repository.jpa.UserRepository;
 import org.example.membership.dto.CreateUserRequest;
@@ -82,7 +81,7 @@ public class JpaMembershipService {
     }
 
     @Transactional(readOnly = true)
-    public java.util.List<CouponInfoResponse> getUserCoupons(Long userId) {
+    public java.util.List<org.example.membership.dto.CouponInfoResponse> getUserCoupons(Long userId) {
         User user = getUserById(userId);
         return couponIssueLogRepository.findByUser(user).stream().map(log -> {
             org.example.membership.dto.CouponInfoResponse dto = new org.example.membership.dto.CouponInfoResponse();
