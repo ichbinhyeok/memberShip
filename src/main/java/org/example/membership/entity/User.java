@@ -26,7 +26,7 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private MembershipLevel membershipLevel = MembershipLevel.SILVER;
+    private MembershipLevel membershipLevel = MembershipLevel.NONE;
 
     @Column(name = "last_membership_change")
     private LocalDateTime lastMembershipChange;
