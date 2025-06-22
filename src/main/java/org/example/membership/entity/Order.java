@@ -25,9 +25,6 @@ public class Order {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-//    @Column(name = "user_id", insertable = false, updatable = false)
-//    private Long userId;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id")
     private Product product;
