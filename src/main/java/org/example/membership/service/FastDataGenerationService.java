@@ -32,9 +32,10 @@ public class FastDataGenerationService {
         int categoryCount = generateCategories();
         int productCount = generateProducts();
         int userCount = generateUsers(30000);
+        int badgeCount = generateBadgeSkeletons();
         int orderCount = generateOrdersForUsers();
-        log.info("🎉 전체 데이터 생성 완료 - categories: {}, products: {}, users: {}, orders: {}",
-                categoryCount, productCount, userCount, orderCount);
+        log.info("🎉 전체 데이터 생성 완료 - categories: {}, products: {}, users: {}, badges: {}, orders: {}",
+                categoryCount, productCount, userCount, badgeCount, orderCount);
     }
 
     private int generateUsers(int count) {
@@ -63,6 +64,42 @@ public class FastDataGenerationService {
             throw new RuntimeException("사용자 배치 삽입 실패", e);
         }
         return inserted;
+    }
+
+    private int generateBadgeSkeletons() {
+        List<Long> userIds = getAllUserIds();
+        List<Long> categoryIds = getAllCategoryIds();
+        if (userIds.isEmpty() || categoryIds.isEmpty()) {
+            return 0;
+        }
+        log.info("🔄 배지 스켈레톤 생성 시작 (JDBC)");
+        int total = 0;
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO badges (user_id, category_id, active, updated_at) VALUES (?, ?, ?, ?)") ) {
+            conn.setAutoCommit(false);
+            for (Long uId : userIds) {
+                for (Long cId : categoryIds) {
+                    ps.setLong(1, uId);
+                    ps.setLong(2, cId);
+                    ps.setBoolean(3, false);
+                    ps.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now()));
+                    ps.addBatch();
+                    total++;
+                    if (total % USER_BATCH_SIZE == 0) {
+                        ps.executeBatch();
+                        ps.clearBatch();
+                        log.info("✅ 배지 진행률: {}", total);
+                    }
+                }
+            }
+            ps.executeBatch();
+            conn.commit();
+            log.info("🎉 배지 스켈레톤 생성 완료");
+        } catch (SQLException e) {
+            throw new RuntimeException("배지 배치 삽입 실패", e);
+        }
+        return total;
     }
 
     private int generateOrdersForUsers() {

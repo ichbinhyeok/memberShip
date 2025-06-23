@@ -26,13 +26,24 @@ public class Badge {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
-    @Column(name = "awarded_at")
-    private LocalDateTime awardedAt;
+    @Column(name = "active")
+    private boolean active = false;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @PrePersist
     protected void onCreate() {
-        if (awardedAt == null) {
-            awardedAt = LocalDateTime.now();
-        }
+        updatedAt = LocalDateTime.now();
+    }
+
+    public void activate() {
+        this.active = true;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void deactivate() {
+        this.active = false;
+        this.updatedAt = LocalDateTime.now();
     }
 }
