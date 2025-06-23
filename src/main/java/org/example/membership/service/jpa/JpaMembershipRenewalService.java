@@ -90,7 +90,7 @@ public class JpaMembershipRenewalService {
 
             for (Map.Entry<Long, Stats> e : userStats.entrySet()) {
                 Stats s = e.getValue();
-                if (s.count >= 3 && s.amount.compareTo(new BigDecimal("100000")) >= 0) {
+                if (s.count >= 5 && s.amount.compareTo(new BigDecimal("300000")) >= 0) {
                     var category = categoryRepository.getReferenceById(e.getKey());
                     if (!badgeRepository.existsByUserAndCategory(user, category)) {
                         Badge badge = new Badge();
