@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.entity.User;
 import org.example.membership.repository.jpa.UserRepository;
+import org.example.membership.repository.jpa.CategoryRepository;
 import org.example.membership.dto.CreateUserRequest;
 import org.example.membership.dto.MembershipInfoResponse;
 import org.example.membership.exception.NotFoundException;
@@ -18,6 +19,7 @@ public class JpaMembershipService {
     private final UserRepository userRepository;
     private final org.example.membership.repository.jpa.BadgeRepository badgeRepository;
     private final org.example.membership.repository.jpa.CouponIssueLogRepository couponIssueLogRepository;
+    private final CategoryRepository categoryRepository;
 
     @Transactional
     public User createUser(CreateUserRequest request) {
@@ -28,7 +30,21 @@ public class JpaMembershipService {
         if (request.getMembershipLevel() != null) {
             user.setMembershipLevel(request.getMembershipLevel());
         }
-        return userRepository.save(user);
+        user = userRepository.save(user);
+
+        // create badge skeletons for all categories
+        List<org.example.membership.entity.Category> categories = categoryRepository.findAll();
+        java.util.List<org.example.membership.entity.Badge> badges = new java.util.ArrayList<>();
+        for (org.example.membership.entity.Category category : categories) {
+            org.example.membership.entity.Badge badge = new org.example.membership.entity.Badge();
+            badge.setUser(user);
+            badge.setCategory(category);
+            badge.setActive(false);
+            badges.add(badge);
+        }
+        badgeRepository.saveAll(badges);
+
+        return user;
     }
 
 

@@ -12,4 +12,6 @@ public interface BadgeRepository extends JpaRepository<Badge, Long> {
     boolean existsByUserAndCategory(User user, Category category);
     long countByUser(User user);
     java.util.List<Badge> findByUser(User user);
+    long countByUserAndActiveTrue(User user);
+    java.util.List<Badge> findByUserAndActiveTrue(User user);
 }
