@@ -17,6 +17,7 @@ import org.example.membership.entity.User;
 import org.example.membership.repository.mybatis.UserMapper;
 import org.example.membership.dto.MembershipLogRequest;
 import org.example.membership.dto.UserOrderTotal;
+import org.example.membership.service.pipeline.MembershipService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StopWatch;
 
@@ -40,7 +41,7 @@ public class MyBatisMembershipRenewalService {
     private final SqlSessionFactory sqlSessionFactory;
     private final CategoryRepository categoryRepository;
     private final BadgeRepository badgeRepository;
-
+    private final MembershipService membershipService;
     private static final int BATCH_SIZE = 5000;
 
     /**
@@ -76,7 +77,8 @@ public class MyBatisMembershipRenewalService {
                         Badge badge = new Badge();
                         badge.setUser(user);
                         badge.setCategory(category);
-                        badge.setAwardedAt(LocalDateTime.now());
+                        badge.activate();
+                        badge.setUpdatedAt(LocalDateTime.now());
                         badgeRepository.save(badge);
                         newBadgeCount++;
                     }
@@ -86,7 +88,7 @@ public class MyBatisMembershipRenewalService {
 
 
             MembershipLevel oldLevel = user.getMembershipLevel();
-            MembershipLevel newLevel = calculateLevel(badgeCount);
+            MembershipLevel newLevel = membershipService.calculateLevel(badgeCount);
 
             user.setMembershipLevel(newLevel);
             user.setLastMembershipChange(LocalDateTime.now());
@@ -362,15 +364,6 @@ public class MyBatisMembershipRenewalService {
         membershipLogMapper.bulkInsertRequests(logs);
     }
 
-    private MembershipLevel calculateLevel(long badgeCount) {
-        if (badgeCount >= 3) {
-            return MembershipLevel.VIP;
-        } else if (badgeCount == 2) {
-            return MembershipLevel.GOLD;
-        } else if (badgeCount == 1) {
-            return MembershipLevel.SILVER;
-        }
-        return MembershipLevel.NONE;
-    }
+
 
 }

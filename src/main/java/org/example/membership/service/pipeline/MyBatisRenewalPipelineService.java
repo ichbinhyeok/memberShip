@@ -6,7 +6,7 @@ import org.example.membership.repository.mybatis.OrderMapper;
 import org.example.membership.repository.mybatis.UserMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.example.membership.service.pipeline.BadgeService.Stats;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -26,7 +26,6 @@ public class MyBatisRenewalPipelineService {
     private final CouponService couponService;
     private final CouponLogService couponLogService;
 
-    public record Stats(long count, BigDecimal amount) {}
 
     private Map<Long, Map<Long, Stats>> collectStats(LocalDate targetDate) {
         LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);

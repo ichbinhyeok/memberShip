@@ -2,7 +2,7 @@ package org.example.membership.service.pipeline;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.entity.User;
-import org.example.membership.repository.jpa.BadgeRepository;
+import org.example.membership.service.pipeline.BadgeService.Stats;
 import org.example.membership.repository.jpa.OrderRepository;
 import org.example.membership.repository.jpa.UserRepository;
 import org.springframework.stereotype.Service;
@@ -21,14 +21,12 @@ public class RenewalPipelineService {
 
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
-    private final BadgeRepository badgeRepository;
     private final BadgeService badgeService;
     private final MembershipService membershipService;
     private final MembershipLogService membershipLogService;
     private final CouponService couponService;
     private final CouponLogService couponLogService;
 
-    public record Stats(long count, BigDecimal amount) {}
 
     private Map<Long, Map<Long, Stats>> collectStats(LocalDate targetDate) {
         LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);

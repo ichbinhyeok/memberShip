@@ -13,7 +13,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create # 개발 환경에서만 권장, 프로덕션에서는 'none' 및 마이그레이션 도구 사용
+      ddl-auto: update # 개발 환경에서만 권장, 프로덕션에서는 'none' 및 마이그레이션 도구 사용
     show-sql: true
     properties:
       hibernate:
