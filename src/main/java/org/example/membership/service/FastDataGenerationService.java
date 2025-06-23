@@ -80,7 +80,7 @@ public class FastDataGenerationService {
                      "INSERT INTO orders (user_id, product_id, order_amount, status, ordered_at) VALUES (?, ?, ?, ?, ?)") ) {
             conn.setAutoCommit(false);
             for (Long userId : userIds) {
-                int orderCount = rand.nextInt(11) + 10; // 10~20
+                int orderCount = rand.nextInt(11) + 30; // 10~20
                 for (int i = 0; i < orderCount; i++, total++) {
                     Long productId = productIds.get(rand.nextInt(productIds.size()));
                     BigDecimal price = productPriceMap.get(productId);
@@ -213,7 +213,9 @@ public class FastDataGenerationService {
     }
 
     private BigDecimal generateRandomPrice() {
-        return BigDecimal.valueOf(ThreadLocalRandom.current().nextInt(10000, 100001));
+        return BigDecimal.valueOf(
+                ThreadLocalRandom.current().nextInt(10, 151) * 1000
+        );
     }
 
     private String getRandomOrderStatus() {
