@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.membership.repository.mybatis.CouponIssueLogMapper">
+    <insert id="insert" parameterType="org.example.membership.entity.CouponIssueLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO coupon_issue_log (
+            user_id,
+            coupon_id,
+            membership_level,
+            issued_at
+        ) VALUES (
+            #{user.id},
+            #{coupon.id},
+            #{membershipLevel},
+            #{issuedAt}
+        )
+    </insert>
+</mapper>

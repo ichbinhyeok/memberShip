@@ -1,12 +1,13 @@
-package org.example.membership.service.pipeline;
+package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.entity.User;
-import org.example.membership.repository.mybatis.OrderMapper;
-import org.example.membership.repository.mybatis.UserMapper;
+import org.example.membership.service.jpa.BadgeService.Stats;
+import org.example.membership.repository.jpa.OrderRepository;
+import org.example.membership.repository.jpa.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.example.membership.service.pipeline.BadgeService.Stats;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -16,10 +17,10 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-public class MyBatisRenewalPipelineService {
+public class RenewalPipelineService {
 
-    private final UserMapper userMapper;
-    private final OrderMapper orderMapper;
+    private final UserRepository userRepository;
+    private final OrderRepository orderRepository;
     private final BadgeService badgeService;
     private final MembershipService membershipService;
     private final MembershipLogService membershipLogService;
@@ -30,12 +31,16 @@ public class MyBatisRenewalPipelineService {
     private Map<Long, Map<Long, Stats>> collectStats(LocalDate targetDate) {
         LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
-        var aggregates = orderMapper.aggregateByUserAndCategoryBetween(
+        List<Object[]> aggregates = orderRepository.aggregateByUserAndCategoryBetween(
                 startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX));
         Map<Long, Map<Long, Stats>> statMap = new HashMap<>();
-        for (var row : aggregates) {
-            statMap.computeIfAbsent(row.getUserId(), k -> new HashMap<>())
-                    .put(row.getCategoryId(), new Stats(row.getOrderCount(), row.getTotalAmount()));
+        for (Object[] row : aggregates) {
+            Long uId = (Long) row[0];
+            Long cId = (Long) row[1];
+            Long cnt = ((Number) row[2]).longValue();
+            BigDecimal amt = (BigDecimal) row[3];
+            statMap.computeIfAbsent(uId, k -> new HashMap<>())
+                    .put(cId, new Stats(cnt, amt));
         }
         return statMap;
     }
@@ -43,7 +48,7 @@ public class MyBatisRenewalPipelineService {
     @Transactional
     public void runBadgeOnly(LocalDate targetDate) {
         Map<Long, Map<Long, Stats>> statMap = collectStats(targetDate);
-        List<User> users = userMapper.findAll();
+        List<User> users = userRepository.findAll();
         for (User user : users) {
             badgeService.updateBadgeStatesForUser(user, statMap.get(user.getId()));
         }
@@ -51,7 +56,7 @@ public class MyBatisRenewalPipelineService {
 
     @Transactional
     public void runLevelOnly() {
-        List<User> users = userMapper.findAll();
+        List<User> users = userRepository.findAll();
         for (User user : users) {
             membershipService.updateUserLevel(user);
         }
@@ -59,7 +64,7 @@ public class MyBatisRenewalPipelineService {
 
     @Transactional
     public void runLogOnly() {
-        List<User> users = userMapper.findAll();
+        List<User> users = userRepository.findAll();
         for (User user : users) {
             membershipLogService.insertMembershipLog(user, user.getMembershipLevel());
         }
@@ -67,7 +72,7 @@ public class MyBatisRenewalPipelineService {
 
     @Transactional
     public void runCouponOnly() {
-        List<User> users = userMapper.findAll();
+        List<User> users = userRepository.findAll();
         for (User user : users) {
             couponService.issueCoupons(user);
         }
@@ -75,13 +80,14 @@ public class MyBatisRenewalPipelineService {
 
     @Transactional
     public void runCouponLogOnly() {
-        // assumes coupons already issued separately
+        // This method assumes coupons were issued just before and not logged yet.
+        // In this simple example we log nothing separately.
     }
 
     @Transactional
-    public void runFull(LocalDate targetDate) {
+    public void runFullJpa(LocalDate targetDate) {
         Map<Long, Map<Long, Stats>> statMap = collectStats(targetDate);
-        List<User> users = userMapper.findAll();
+        List<User> users = userRepository.findAll();
         for (User user : users) {
             badgeService.updateBadgeStatesForUser(user, statMap.get(user.getId()));
             var prev = membershipService.updateUserLevel(user);
