@@ -1,4 +1,4 @@
-package org.example.membership.service.pipeline;
+package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.CouponAmount;

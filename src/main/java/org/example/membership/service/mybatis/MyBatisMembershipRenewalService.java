@@ -17,7 +17,7 @@ import org.example.membership.entity.User;
 import org.example.membership.repository.mybatis.UserMapper;
 import org.example.membership.dto.MembershipLogRequest;
 import org.example.membership.dto.UserOrderTotal;
-import org.example.membership.service.pipeline.MembershipService;
+import org.example.membership.service.jpa.MembershipService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StopWatch;
 
