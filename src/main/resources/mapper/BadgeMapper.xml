@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.membership.repository.mybatis.BadgeMapper">
+
+    <resultMap id="badgeResultMap" type="org.example.membership.entity.Badge">
+        <id property="id" column="id"/>
+        <result property="active" column="active"/>
+        <result property="updatedAt" column="updated_at"/>
+        <association property="user" javaType="org.example.membership.entity.User">
+            <id property="id" column="user_id"/>
+        </association>
+        <association property="category" javaType="org.example.membership.entity.Category">
+            <id property="id" column="category_id"/>
+        </association>
+    </resultMap>
+
+    <select id="findByUserId" resultMap="badgeResultMap">
+        SELECT * FROM badges WHERE user_id = #{userId}
+    </select>
+
+    <update id="update" parameterType="org.example.membership.entity.Badge">
+        UPDATE badges
+        SET active = #{active},
+            updated_at = #{updatedAt},
+            category_id = #{category.id}
+        WHERE id = #{id}
+    </update>
+
+</mapper>
