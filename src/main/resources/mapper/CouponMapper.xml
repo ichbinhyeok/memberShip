@@ -18,6 +18,10 @@
         SELECT * FROM coupons
     </select>
 
+    <select id="findAutoCouponByCategoryId" resultMap="couponResultMap">
+        SELECT * FROM coupons WHERE category_id = #{categoryId}
+    </select>
+
     <select id="findById" resultMap="couponResultMap">
         SELECT * FROM coupons WHERE id = #{id}
     </select>

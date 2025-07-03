@@ -3,19 +3,12 @@ package org.example.membership.service.mybatis;
 import lombok.RequiredArgsConstructor;
 import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.dto.UserCategoryOrderStats;
-import org.example.membership.entity.Badge;
-import org.example.membership.entity.Coupon;
-import org.example.membership.entity.User;
-import org.example.membership.repository.mybatis.BadgeMapper;
-import org.example.membership.repository.mybatis.CouponMapper;
-import org.example.membership.repository.mybatis.MembershipLogMapper;
-import org.example.membership.repository.mybatis.OrderMapper;
-import org.example.membership.repository.mybatis.UserMapper;
+import org.example.membership.entity.*;
+import org.example.membership.repository.mybatis.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.membership.common.enums.CouponAmount;
 import org.example.membership.common.enums.MembershipLevel;
-import org.example.membership.entity.MembershipLog;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -37,8 +30,7 @@ public class MyBatisRenewalPipelineService {
     private final CouponMapper couponMapper;
     private final BadgeMapper badgeMapper;
     private final MyBatisBadgeService badgeService;
-    private final MyBatisCouponLogService couponLogService;
-
+    private final CouponIssueLogMapper couponIssueLogMapper;
 
     private Map<Long, Map<Long, OrderCountAndAmount>> collectStats(LocalDate targetDate) {
         // 1. 집계 대상 기간 계산: 최근 3개월간 (1일 ~ 전달 말일)
@@ -99,6 +91,30 @@ public class MyBatisRenewalPipelineService {
     }
 
     @Transactional
+    public void runLevelAndLog() {
+        List<User> users = userMapper.findAll();
+
+        long updateTotalTime = 0L;
+        long insertTotalTime = 0L;
+
+        for (User user : users) {
+            MembershipLevel previous = user.getMembershipLevel();
+
+            long updateStart = System.currentTimeMillis();
+            updateMembershipLevel(user);
+            updateTotalTime += System.currentTimeMillis() - updateStart;
+
+            long insertStart = System.currentTimeMillis();
+            insertMembershipLog(user, previous);
+            insertTotalTime += System.currentTimeMillis() - insertStart;
+        }
+
+        System.out.println("등급 업데이트 총 소요 시간: " + updateTotalTime + "ms");
+        System.out.println("로그 insert 총 소요 시간: " + insertTotalTime + "ms");
+    }
+
+
+    @Transactional
     public void runCouponOnly() {
         List<User> users = userMapper.findAll();
         for (User user : users) {
@@ -106,10 +122,7 @@ public class MyBatisRenewalPipelineService {
         }
     }
 
-    @Transactional
-    public void runCouponLogOnly() {
-        // assumes coupons already issued separately
-    }
+
 
     @Transactional
     public void runFull(LocalDate targetDate) {
@@ -119,8 +132,8 @@ public class MyBatisRenewalPipelineService {
             badgeService.updateBadgeStatesForUser(user, statMap.get(user.getId()));
             var prev = updateMembershipLevel(user);
             insertMembershipLog(user, prev);
-            var coupons = issueCoupons(user);
-            couponLogService.insertCouponLogs(user, coupons);
+            issueCoupons(user);
+
         }
     }
 
@@ -144,27 +157,28 @@ public class MyBatisRenewalPipelineService {
         membershipLogMapper.insert(log);
     }
 
-    private List<Coupon> issueCoupons(User user) {
+    private void issueCoupons(User user) {
         int qty = switch (user.getMembershipLevel()) {
             case VIP -> 3;
             case GOLD -> 2;
             case SILVER -> 1;
             default -> 0;
         };
-        List<Coupon> issued = new ArrayList<>();
-        if (qty == 0) return issued;
+        if (qty == 0) return;
+
         List<Badge> badges = badgeMapper.findByUserIdAndActiveTrue(user.getId());
         for (Badge badge : badges) {
-            for (int i = 0; i < qty; i++) {
-                Coupon c = new Coupon();
-                c.setCode("AUTO-" + UUID.randomUUID().toString().substring(0, 8));
-                c.setDiscountAmount(CouponAmount.W1000);
-                c.setCategory(badge.getCategory());
-                couponMapper.insert(c);
-                issued.add(c);
+            Coupon coupon = couponMapper.findAutoCouponByCategoryId(badge.getCategory().getId());
+            if (coupon == null) continue;
+            int already = couponIssueLogMapper.countByUserIdAndCouponId(user.getId(), coupon.getId());
+            for (int i = already; i < qty; i++) {
+                CouponIssueLog log = new CouponIssueLog();
+                log.setUser(user);
+                log.setCoupon(coupon);
+                log.setMembershipLevel(user.getMembershipLevel());
+                couponIssueLogMapper.insert(log);
             }
         }
-        return issued;
     }
 
     private MembershipLevel calculateLevel(long badgeCount) {

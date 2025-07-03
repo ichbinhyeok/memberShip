@@ -24,6 +24,7 @@ public class FastDataGenerationService {
     private static final int ORDER_BATCH_SIZE = 10000;
     private static final int PRODUCT_BATCH_SIZE = 1000;
     private static final int CATEGORY_BATCH_SIZE = 100;
+    private static final int COUPON_BATCH_SIZE = 100;
 
     private static final String[] LAST_NAMES = {"김", "이", "박", "최", "정", "강", "조", "윤", "장", "임", "한", "오", "서", "신", "권", "황", "안", "송", "류", "전", "홍", "고", "문", "양", "손", "배", "조", "백", "허", "유"};
     private static final String[] FIRST_NAMES = {"민준", "서준", "예준", "도윤", "시우", "주원", "하준", "지호", "지후", "준서", "서진", "은우", "현우", "연우", "정우", "승우", "시원", "민재", "현준", "원준", "지원", "서현", "서윤", "지우", "하은", "민서", "윤서", "수아", "소율", "지안", "채원", "예원", "유나", "서아", "다은", "예은", "시은", "하린", "연서", "수빈", "영희", "철수", "영수", "순자", "미영", "정호", "승현", "태현", "진우", "상훈"};
@@ -33,9 +34,10 @@ public class FastDataGenerationService {
         int productCount = generateProducts();
         int userCount = generateUsers(30000);
         int badgeCount = generateBadgeSkeletons();
+        int couponCount = generateCouponPoliciesByCategory();
         int orderCount = generateOrdersForUsers();
-        log.info("🎉 전체 데이터 생성 완료 - categories: {}, products: {}, users: {}, badges: {}, orders: {}",
-                categoryCount, productCount, userCount, badgeCount, orderCount);
+        log.info("🎉 전체 데이터 생성 완료 - categories: {}, coupons: {}, products: {}, users: {}, badges: {}, orders: {}",
+                categoryCount, couponCount, productCount, userCount, badgeCount, orderCount);
     }
 
     private int generateUsers(int count) {
@@ -202,6 +204,40 @@ public class FastDataGenerationService {
         return inserted;
     }
 
+    private int generateCouponPoliciesByCategory() {
+        List<Long> categoryIds = getAllCategoryIds();
+        if (categoryIds.isEmpty()) {
+            return 0;
+        }
+        log.info("🔄 카테고리별 쿠폰 정책 생성 시작 (JDBC)");
+        int inserted = 0;
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement("""
+             INSERT INTO coupons (category_id, discount_amount,code)
+             VALUES (?, ?,?)
+        """)) {
+            conn.setAutoCommit(false);
+            for (Long catId : categoryIds) {
+                ps.setLong(1, catId);
+                ps.setBigDecimal(2, new BigDecimal("1000.00"));
+                ps.setString(3, UUID.randomUUID().toString().substring(0, 8));
+                ps.addBatch();
+
+                inserted++;
+                if (inserted % CATEGORY_BATCH_SIZE == 0) {
+                    ps.executeBatch();
+                    ps.clearBatch();
+                    log.info("✅ 쿠폰 정책 진행률: {}", inserted);
+                }
+            }
+            ps.executeBatch();
+            conn.commit();
+            log.info("🎉 쿠폰 정책 생성 완료");
+        } catch (SQLException e) {
+            throw new RuntimeException("쿠폰 정책 배치 삽입 실패", e);
+        }
+        return inserted;
+    }
     private List<Long> getAllUserIds() {
         List<Long> ids = new ArrayList<>();
         try (Connection conn = dataSource.getConnection();

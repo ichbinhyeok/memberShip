@@ -13,4 +13,5 @@ public interface CouponIssueLogMapper {
     List<CouponIssueLog> findByUserId(@Param("userId") Long userId);
     List<CouponIssueLog> findAll();
     void deleteById(@Param("id") Long id);
+    int countByUserIdAndCouponId(@Param("userId") Long userId, @Param("couponId") Long couponId);
 }

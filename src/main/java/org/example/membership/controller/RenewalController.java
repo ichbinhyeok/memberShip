@@ -117,15 +117,20 @@ public class RenewalController {
         return ResponseEntity.ok().build();
     }
 
-    @Operation(summary = "5️⃣ MyBatis - 쿠폰 발급 로그 기록")
-    @PutMapping("/mybatis/5-coupon-log")
-    public ResponseEntity<Void> couponLogOnlyMybatis() {
+
+
+    @Operation(summary = "⏱ MyBatis - 등급 갱신 + 로그 기록 (내부 분리 시간 포함)")
+    @PutMapping("/mybatis/2-level-log-timing")
+    public ResponseEntity<Void> levelAndLogWithInternalTiming() {
         long start = System.currentTimeMillis();
-        myBatisRenewalPipelineService.runCouponLogOnly();
+        myBatisRenewalPipelineService.runLevelAndLog();
         long end = System.currentTimeMillis();
-        System.out.println("⏱ MyBatis 쿠폰 로그 기록 소요 시간: " + (end - start) + "ms");
+
+        System.out.println("⏱ [컨트롤러] 전체 수행 시간: " + (end - start) + "ms");
         return ResponseEntity.ok().build();
     }
+
+
 
     // --- 통합 실행 ---
 

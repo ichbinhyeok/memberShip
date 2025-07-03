@@ -13,4 +13,5 @@ public interface CouponMapper {
     List<Coupon> findAll();
     void update(Coupon coupon);
     void deleteById(@Param("id") Long id);
+    Coupon findAutoCouponByCategoryId(@Param("categoryId") Long categoryId);
 }

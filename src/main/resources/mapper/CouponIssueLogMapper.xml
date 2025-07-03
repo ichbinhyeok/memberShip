@@ -13,6 +13,12 @@
         </association>
     </resultMap>
 
+    <select id="countByUserIdAndCouponId" resultType="int">
+        SELECT COUNT(*)
+        FROM coupon_issue_log
+        WHERE user_id = #{userId} AND coupon_id = #{couponId}
+    </select>
+
     <select id="findById" resultMap="logResultMap">
         SELECT * FROM coupon_issue_log WHERE id = #{id}
     </select>
