@@ -96,18 +96,5 @@ public class JpaMembershipService {
         return resp;
     }
 
-    @Transactional(readOnly = true)
-    public java.util.List<org.example.membership.dto.CouponInfoResponse> getUserCoupons(Long userId) {
-        User user = getUserById(userId);
-        return couponIssueLogRepository.findByUser(user).stream().map(log -> {
-            org.example.membership.dto.CouponInfoResponse dto = new org.example.membership.dto.CouponInfoResponse();
-            dto.setId(log.getCoupon().getId());
-            dto.setCode(log.getCoupon().getCode());
-            if (log.getCoupon().getCategory() != null) {
-                dto.setCategory(log.getCoupon().getCategory().getName().name());
-            }
-            dto.setExpiresAt(log.getCoupon().getExpiresAt());
-            return dto;
-        }).toList();
-    }
+
 }

@@ -56,10 +56,5 @@ public class UserController {
         return ResponseEntity.ok(membershipService.getUserStatus(userId));
     }
 
-    @Operation(summary = "사용자 쿠폰 목록 조회")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "조회 성공")})
-    @GetMapping("/{id}/coupons")
-    public ResponseEntity<List<org.example.membership.dto.CouponInfoResponse>> getCoupons(@PathVariable("id") Long userId) {
-        return ResponseEntity.ok(membershipService.getUserCoupons(userId));
-    }
+
 }

@@ -1,13 +1,46 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.example.membership.repository.mybatis.CouponIssueLogMapper">
 
+    <resultMap id="logResultMap" type="org.example.membership.entity.CouponIssueLog">
+        <id property="id" column="id"/>
+        <result property="membershipLevel" column="membership_level"/>
+        <result property="issuedAt" column="issued_at"/>
+        <association property="user" javaType="org.example.membership.entity.User">
+            <id property="id" column="user_id"/>
+        </association>
+        <association property="coupon" javaType="org.example.membership.entity.Coupon">
+            <id property="id" column="coupon_id"/>
+        </association>
+    </resultMap>
+
+    <select id="findById" resultMap="logResultMap">
+        SELECT * FROM coupon_issue_log WHERE id = #{id}
+    </select>
+
+    <select id="findByUserId" resultMap="logResultMap">
+        SELECT * FROM coupon_issue_log WHERE user_id = #{userId}
+    </select>
+
+    <select id="findAll" resultMap="logResultMap">
+        SELECT * FROM coupon_issue_log
+    </select>
+
+    <insert id="insert" parameterType="org.example.membership.entity.CouponIssueLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO coupon_issue_log (user_id, coupon_id, membership_level, issued_at)
+        VALUES (#{user.id}, #{coupon.id}, #{membershipLevel}, #{issuedAt})
+    </insert>
+
+    <delete id="deleteById">
+        DELETE FROM coupon_issue_log WHERE id = #{id}
+    </delete>
+
+
     <insert id="insertAll" parameterType="java.util.List">
         INSERT INTO coupon_issue_log (
-            user_id,
-            coupon_id,
-            membership_level,
-            issued_at
+        user_id,
+        coupon_id,
+        membership_level,
+        issued_at
         )
         VALUES
         <foreach collection="list" item="log" separator=",">
@@ -19,5 +52,6 @@
             )
         </foreach>
     </insert>
-
 </mapper>
+
+

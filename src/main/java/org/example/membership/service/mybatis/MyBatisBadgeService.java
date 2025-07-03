@@ -1,6 +1,7 @@
 package org.example.membership.service.mybatis;
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.User;
 import org.example.membership.repository.mybatis.BadgeMapper;
@@ -18,17 +19,16 @@ public class MyBatisBadgeService {
 
     private final BadgeMapper badgeMapper;
 
-    public record Stats(long count, BigDecimal amount) {}
 
     @Transactional
-    public void updateBadgeStatesForUser(User user, Map<Long, Stats> statsByCategory) {
+    public void updateBadgeStatesForUser(User user, Map<Long, OrderCountAndAmount> statsByCategory) {
         if (statsByCategory == null) {
             statsByCategory = Collections.emptyMap();
         }
         List<Badge> badges = badgeMapper.findByUserId(user.getId());
         for (Badge badge : badges) {
-            Stats stat = statsByCategory.get(badge.getCategory().getId());
-            if (stat != null && stat.count >= 5 && stat.amount.compareTo(new BigDecimal("300000")) >= 0) {
+            OrderCountAndAmount stat = statsByCategory.get(badge.getCategory().getId());
+            if (stat != null && stat.getCount() >= 5 && stat.getAmount().compareTo(new BigDecimal("300000")) >= 0) {
                 badge.activate();
             } else {
                 badge.deactivate();

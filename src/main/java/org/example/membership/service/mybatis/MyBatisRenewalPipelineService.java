@@ -1,6 +1,8 @@
 package org.example.membership.service.mybatis;
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.dto.OrderCountAndAmount;
+import org.example.membership.dto.UserCategoryOrderStats;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.Coupon;
 import org.example.membership.entity.User;
@@ -11,12 +13,11 @@ import org.example.membership.repository.mybatis.OrderMapper;
 import org.example.membership.repository.mybatis.UserMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.example.membership.service.mybatis.MyBatisBadgeService;
-import org.example.membership.service.mybatis.MyBatisBadgeService.Stats;
-import org.example.membership.service.mybatis.MyBatisCouponLogService;
 import org.example.membership.common.enums.CouponAmount;
 import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.entity.MembershipLog;
+
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -39,22 +40,42 @@ public class MyBatisRenewalPipelineService {
     private final MyBatisCouponLogService couponLogService;
 
 
-    private Map<Long, Map<Long, Stats>> collectStats(LocalDate targetDate) {
+    private Map<Long, Map<Long, OrderCountAndAmount>> collectStats(LocalDate targetDate) {
+        // 1. 집계 대상 기간 계산: 최근 3개월간 (1일 ~ 전달 말일)
         LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
-        var aggregates = orderMapper.aggregateByUserAndCategoryBetween(
-                startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX));
-        Map<Long, Map<Long, Stats>> statMap = new HashMap<>();
-        for (var row : aggregates) {
-            statMap.computeIfAbsent(row.getUserId(), k -> new HashMap<>())
-                    .put(row.getCategoryId(), new Stats(row.getOrderCount(), row.getTotalAmount()));
+
+        // 2. MyBatis 쿼리 결과 받아오기
+        List<UserCategoryOrderStats> aggregates =
+                orderMapper.aggregateByUserAndCategoryBetween(
+                        startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX));
+
+        // 3. 결과 저장용 Map: userId → categoryId → OrderCountAndAmount
+        Map<Long, Map<Long, OrderCountAndAmount>> statMap = new HashMap<>();
+
+        for (UserCategoryOrderStats row : aggregates) {
+            Long userId = row.getUserId();
+            Long categoryId = row.getCategoryId();
+            long count = row.getOrderCount();
+            BigDecimal amount = row.getTotalAmount();
+
+            // userId가 없다면 새로운 category Map 생성
+            if (!statMap.containsKey(userId)) {
+                statMap.put(userId, new HashMap<Long, OrderCountAndAmount>());
+            }
+
+            // categoryId 기준으로 값 설정
+            Map<Long, OrderCountAndAmount> categoryMap = statMap.get(userId);
+            categoryMap.put(categoryId, new OrderCountAndAmount(count, amount));
         }
+
         return statMap;
     }
 
+
     @Transactional
     public void runBadgeOnly(LocalDate targetDate) {
-        Map<Long, Map<Long, Stats>> statMap = collectStats(targetDate);
+        Map<Long, Map<Long, OrderCountAndAmount>> statMap = collectStats(targetDate); // user_id->category_id-> {long count, BigDecimal Amount}
         List<User> users = userMapper.findAll();
         for (User user : users) {
             badgeService.updateBadgeStatesForUser(user, statMap.get(user.getId()));
@@ -92,7 +113,7 @@ public class MyBatisRenewalPipelineService {
 
     @Transactional
     public void runFull(LocalDate targetDate) {
-        Map<Long, Map<Long, Stats>> statMap = collectStats(targetDate);
+        Map<Long, Map<Long, OrderCountAndAmount>> statMap = collectStats(targetDate);
         List<User> users = userMapper.findAll();
         for (User user : users) {
             badgeService.updateBadgeStatesForUser(user, statMap.get(user.getId()));

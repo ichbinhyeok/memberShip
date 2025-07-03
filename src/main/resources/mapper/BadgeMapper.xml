@@ -14,16 +14,47 @@
         </association>
     </resultMap>
 
+
+    <select id="findById" resultMap="badgeResultMap">
+        SELECT * FROM badges WHERE id = #{id}
+    </select>
+
     <select id="findByUserId" resultMap="badgeResultMap">
         SELECT * FROM badges WHERE user_id = #{userId}
     </select>
 
+    <select id="findByUserIdAndActiveTrue" resultMap="badgeResultMap">
+        SELECT * FROM badges WHERE user_id = #{userId} AND active = TRUE
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(*) FROM badges WHERE user_id = #{userId}
+    </select>
+
+    <select id="countByUserIdAndActiveTrue" resultType="long">
+        SELECT COUNT(*) FROM badges WHERE user_id = #{userId} AND active = TRUE
+    </select>
+
+    <select id="existsByUserIdAndCategoryId" resultType="boolean">
+        SELECT COUNT(*) > 0 FROM badges WHERE user_id = #{userId} AND category_id = #{categoryId}
+    </select>
+
+    <insert id="insert" parameterType="org.example.membership.entity.Badge" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO badges (user_id, category_id, active, updated_at)
+        VALUES (#{user.id}, #{category.id}, #{active}, #{updatedAt})
+    </insert>
+
     <update id="update" parameterType="org.example.membership.entity.Badge">
         UPDATE badges
-        SET active = #{active},
-            updated_at = #{updatedAt},
-            category_id = #{category.id}
+        SET user_id = #{user.id},
+            category_id = #{category.id},
+            active = #{active},
+            updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
+
+    <delete id="deleteById">
+        DELETE FROM badges WHERE id = #{id}
+    </delete>
 
 </mapper>
