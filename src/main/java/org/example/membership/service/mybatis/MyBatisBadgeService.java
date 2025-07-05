@@ -28,7 +28,7 @@ public class MyBatisBadgeService {
         List<Badge> badges = badgeMapper.findByUserId(user.getId());
         for (Badge badge : badges) {
             OrderCountAndAmount stat = statsByCategory.get(badge.getCategory().getId());
-            if (stat != null && stat.getCount() >= 5 && stat.getAmount().compareTo(new BigDecimal("300000")) >= 0) {
+            if (stat != null && stat.getCount() >= 3 && stat.getAmount().compareTo(new BigDecimal("100000")) >= 0) {
                 badge.activate();
             } else {
                 badge.deactivate();

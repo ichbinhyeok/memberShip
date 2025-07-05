@@ -65,15 +65,17 @@ public class RenewalController {
         return ResponseEntity.ok().build();
     }
 
-    @Operation(summary = "5️⃣ JPA - 쿠폰 발급 로그 기록")
-    @PutMapping("/jpa/5-coupon-log")
-    public ResponseEntity<Void> couponLogOnly() {
+    @Operation(summary = "⏱ JPA - 등급 갱신 + 로그 기록 (내부 분리 시간 포함)")
+    @PutMapping("/jpa/2-level-log-timing")
+    public ResponseEntity<Void> levelAndLogWithInternalTimingJpa() {
         long start = System.currentTimeMillis();
-        renewalPipelineService.runCouponLogOnly();
+        renewalPipelineService.runLevelAndLog();  // ← 새로 추가한 JPA 서비스 메서드
         long end = System.currentTimeMillis();
-        System.out.println("⏱ JPA 쿠폰 로그 기록 소요 시간: " + (end - start) + "ms");
+        System.out.println("⏱ [컨트롤러] JPA 등급+로그 전체 수행 시간: " + (end - start) + "ms");
         return ResponseEntity.ok().build();
     }
+
+
 
     // --- MyBatis 기반 단계별 실행 ---
 

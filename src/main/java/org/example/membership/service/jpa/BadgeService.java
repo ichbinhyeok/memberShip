@@ -1,6 +1,7 @@
 package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.Category;
 import org.example.membership.entity.User;
@@ -22,14 +23,14 @@ public class BadgeService {
     public record Stats(long count, BigDecimal amount) {}
 
     @Transactional
-    public void updateBadgeStatesForUser(User user, Map<Long, Stats> statsByCategory) {
+    public void updateBadgeStatesForUser(User user, Map<Long, OrderCountAndAmount> statsByCategory) {
         if (statsByCategory == null) {
             statsByCategory = Collections.emptyMap();
         }
         List<Badge> badges = badgeRepository.findByUser(user);
         for (Badge badge : badges) {
-            Stats stat = statsByCategory.get(badge.getCategory().getId());
-            if (stat != null && stat.count >= 5 && stat.amount.compareTo(new BigDecimal("300000")) >= 0) {
+            OrderCountAndAmount stat = statsByCategory.get(badge.getCategory().getId());
+            if (stat != null && stat.getCount() >= 3 && stat.getAmount().compareTo(new BigDecimal("100000")) >= 0) {
                 badge.activate();
             } else {
                 badge.deactivate();

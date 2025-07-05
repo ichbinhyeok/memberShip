@@ -1,6 +1,8 @@
 package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.common.enums.MembershipLevel;
+import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.User;
 import org.example.membership.service.jpa.BadgeService.Stats;
 import org.example.membership.repository.jpa.OrderRepository;
@@ -10,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
@@ -28,26 +31,34 @@ public class RenewalPipelineService {
     private final CouponLogService couponLogService;
 
 
-    private Map<Long, Map<Long, Stats>> collectStats(LocalDate targetDate) {
+    private Map<Long, Map<Long, OrderCountAndAmount>> collectStats(LocalDate targetDate) {
         LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);
         LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
-        List<Object[]> aggregates = orderRepository.aggregateByUserAndCategoryBetween(
-                startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX));
-        Map<Long, Map<Long, Stats>> statMap = new HashMap<>();
+
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+        List<Object[]> aggregates = orderRepository.aggregateByUserAndCategoryBetween(startDateTime, endDateTime);
+
+        Map<Long, Map<Long, OrderCountAndAmount>> statMap = new HashMap<>();
+
         for (Object[] row : aggregates) {
-            Long uId = (Long) row[0];
-            Long cId = (Long) row[1];
-            Long cnt = ((Number) row[2]).longValue();
-            BigDecimal amt = (BigDecimal) row[3];
-            statMap.computeIfAbsent(uId, k -> new HashMap<>())
-                    .put(cId, new Stats(cnt, amt));
+            Long userId = (Long) row[0];
+            Long categoryId = (Long) row[1];
+            Long count = ((Number) row[2]).longValue();
+            BigDecimal amount = (BigDecimal) row[3];
+
+            Map<Long, OrderCountAndAmount> categoryMap = statMap.computeIfAbsent(userId, k -> new HashMap<>());
+            categoryMap.put(categoryId, new OrderCountAndAmount(count, amount));
         }
+
         return statMap;
     }
 
+
     @Transactional
     public void runBadgeOnly(LocalDate targetDate) {
-        Map<Long, Map<Long, Stats>> statMap = collectStats(targetDate);
+        Map<Long, Map<Long, OrderCountAndAmount>> statMap = collectStats(targetDate);
         List<User> users = userRepository.findAll();
         for (User user : users) {
             badgeService.updateBadgeStatesForUser(user, statMap.get(user.getId()));
@@ -71,6 +82,30 @@ public class RenewalPipelineService {
     }
 
     @Transactional
+    public void runLevelAndLog() {
+        List<User> users = userRepository.findAll();
+
+        long updateTotalTime = 0L;
+        long insertTotalTime = 0L;
+
+        for (User user : users) {
+            MembershipLevel previous = user.getMembershipLevel();
+
+            long updateStart = System.currentTimeMillis();
+            MembershipLevel newLevel = membershipService.updateUserLevel(user); // 변경 수행
+            updateTotalTime += System.currentTimeMillis() - updateStart;
+
+            long insertStart = System.currentTimeMillis();
+            membershipLogService.insertMembershipLog(user, previous); // 변경 전 등급으로 로그 기록
+            insertTotalTime += System.currentTimeMillis() - insertStart;
+        }
+
+        System.out.println("등급 업데이트 총 소요 시간: " + updateTotalTime + "ms");
+        System.out.println("로그 insert 총 소요 시간: " + insertTotalTime + "ms");
+    }
+
+
+    @Transactional
     public void runCouponOnly() {
         List<User> users = userRepository.findAll();
         for (User user : users) {
@@ -78,22 +113,18 @@ public class RenewalPipelineService {
         }
     }
 
-    @Transactional
-    public void runCouponLogOnly() {
-        // This method assumes coupons were issued just before and not logged yet.
-        // In this simple example we log nothing separately.
-    }
+
 
     @Transactional
     public void runFullJpa(LocalDate targetDate) {
-        Map<Long, Map<Long, Stats>> statMap = collectStats(targetDate);
+        Map<Long, Map<Long, OrderCountAndAmount>> statMap = collectStats(targetDate);
         List<User> users = userRepository.findAll();
         for (User user : users) {
             badgeService.updateBadgeStatesForUser(user, statMap.get(user.getId()));
             var prev = membershipService.updateUserLevel(user);
             membershipLogService.insertMembershipLog(user, prev);
-            var coupons = couponService.issueCoupons(user);
-            couponLogService.insertCouponLogs(user, coupons);
+            couponService.issueCoupons(user); // 내부에서 로그 기록까지 수행
         }
     }
+
 }

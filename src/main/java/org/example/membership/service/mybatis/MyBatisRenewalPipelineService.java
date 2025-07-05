@@ -90,6 +90,7 @@ public class MyBatisRenewalPipelineService {
         }
     }
 
+
     @Transactional
     public void runLevelAndLog() {
         List<User> users = userMapper.findAll();
