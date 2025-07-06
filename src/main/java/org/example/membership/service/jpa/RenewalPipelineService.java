@@ -1,10 +1,13 @@
 package org.example.membership.service.jpa;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.dto.OrderCountAndAmount;
+import org.example.membership.entity.Badge;
 import org.example.membership.entity.User;
-import org.example.membership.service.jpa.BadgeService.Stats;
+import org.example.membership.repository.jpa.BadgeRepository;
 import org.example.membership.repository.jpa.OrderRepository;
 import org.example.membership.repository.jpa.UserRepository;
 import org.springframework.stereotype.Service;
@@ -28,8 +31,10 @@ public class RenewalPipelineService {
     private final MembershipService membershipService;
     private final MembershipLogService membershipLogService;
     private final CouponService couponService;
-    private final CouponLogService couponLogService;
+    private final BadgeRepository badgeRepository;
 
+    @PersistenceContext
+    private EntityManager entityManager;
 
     private Map<Long, Map<Long, OrderCountAndAmount>> collectStats(LocalDate targetDate) {
         LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);
@@ -60,10 +65,29 @@ public class RenewalPipelineService {
     public void runBadgeOnly(LocalDate targetDate) {
         Map<Long, Map<Long, OrderCountAndAmount>> statMap = collectStats(targetDate);
         List<User> users = userRepository.findAll();
+
+        final int BATCH_SIZE = 1000;
+        int count = 0;
+
         for (User user : users) {
-            badgeService.updateBadgeStatesForUser(user, statMap.get(user.getId()));
+            Map<Long, OrderCountAndAmount> stats = statMap.get(user.getId());
+            List<Badge> modifiedBadges = badgeService.updateBadgeStatesForUser(user, stats);
+
+            for (Badge badge : modifiedBadges) {
+                badgeRepository.save(badge); // 명시적 업데이트
+                count++;
+
+                if (count % BATCH_SIZE == 0) {
+                    entityManager.flush();
+                    entityManager.clear();
+                }
+            }
         }
+
+        entityManager.flush();
+        entityManager.clear();
     }
+
 
     @Transactional
     public void runLevelOnly() {

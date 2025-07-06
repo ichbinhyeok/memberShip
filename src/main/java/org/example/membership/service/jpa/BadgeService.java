@@ -20,21 +20,31 @@ public class BadgeService {
 
     private final BadgeRepository badgeRepository;
 
-    public record Stats(long count, BigDecimal amount) {}
-
-    @Transactional
-    public void updateBadgeStatesForUser(User user, Map<Long, OrderCountAndAmount> statsByCategory) {
+    public List<Badge> updateBadgeStatesForUser(User user, Map<Long, OrderCountAndAmount> statsByCategory) {
         if (statsByCategory == null) {
             statsByCategory = Collections.emptyMap();
         }
+
+        List<Badge> modifiedBadges = new java.util.ArrayList<>();
         List<Badge> badges = badgeRepository.findByUser(user);
+
         for (Badge badge : badges) {
             OrderCountAndAmount stat = statsByCategory.get(badge.getCategory().getId());
-            if (stat != null && stat.getCount() >= 3 && stat.getAmount().compareTo(new BigDecimal("100000")) >= 0) {
-                badge.activate();
-            } else {
-                badge.deactivate();
+
+            boolean shouldBeActive = stat != null &&
+                    stat.getCount() >= 3 &&
+                    stat.getAmount().compareTo(new BigDecimal("100000")) >= 0;
+
+            if (badge.isActive() != shouldBeActive) {
+                if (shouldBeActive) {
+                    badge.activate();
+                } else {
+                    badge.deactivate();
+                }
+                modifiedBadges.add(badge);
             }
         }
+
+        return modifiedBadges;
     }
 }
