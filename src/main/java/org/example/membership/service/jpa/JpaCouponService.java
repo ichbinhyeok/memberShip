@@ -3,8 +3,6 @@ package org.example.membership.service.jpa;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
-import org.example.membership.common.enums.CouponAmount;
-import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.Coupon;
 import org.example.membership.entity.CouponIssueLog;
@@ -19,12 +17,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class CouponService {
+public class JpaCouponService {
 
     private final BadgeRepository badgeRepository;
     private final CouponRepository couponRepository;
@@ -71,11 +68,21 @@ public class CouponService {
 
     @Transactional
     public void bulkIssueCoupons(List<User> users, int batchSize) {
+        // 1. 사용자별 배지 사전 조회
         Map<Long, List<Badge>> badgeMap = badgeRepository.findAllByUserInAndActiveTrue(users).stream()
                 .collect(Collectors.groupingBy(b -> b.getUser().getId()));
 
+        // 2. 전체 쿠폰 사전 조회 (카테고리 기준)
         Map<Long, Coupon> couponMap = couponRepository.findAll().stream()
                 .collect(Collectors.toMap(c -> c.getCategory().getId(), c -> c));
+
+        // 3. 기존 발급 로그를 미리 조회하여 캐싱 (userId + couponId 기준)
+        List<CouponIssueLog> existingLogs = couponIssueLogRepository.findAllByUserIn(users);
+        Map<String, Long> issuedCountMap = existingLogs.stream()
+                .collect(Collectors.groupingBy(
+                        log -> log.getUser().getId() + "-" + log.getCoupon().getId(),
+                        Collectors.counting()
+                ));
 
         int count = 0;
 
@@ -94,7 +101,10 @@ public class CouponService {
                 Coupon coupon = couponMap.get(badge.getCategory().getId());
                 if (coupon == null) continue;
 
-                for (int i = 0; i < qty; i++) {
+                String key = user.getId() + "-" + coupon.getId();
+                long already = issuedCountMap.getOrDefault(key, 0L);
+
+                for (int i = (int) already; i < qty; i++) {
                     CouponIssueLog log = new CouponIssueLog();
                     log.setUser(user);
                     log.setCoupon(coupon);
@@ -115,6 +125,7 @@ public class CouponService {
         entityManager.flush();
         entityManager.clear();
     }
+
 
 
 }

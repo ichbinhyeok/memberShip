@@ -2,13 +2,20 @@ package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.OrderStatus;
+import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.Order;
 import org.example.membership.repository.jpa.OrderRepository;
 import org.example.membership.dto.OrderResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -61,6 +68,31 @@ public class JpaOrderService {
             dto.setOrderedAt(order.getOrderedAt());
             return dto;
         }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, Map<Long, OrderCountAndAmount>> aggregateUserCategoryStats(LocalDate targetDate) {
+        LocalDate startDate = targetDate.withDayOfMonth(1).minusMonths(3);
+        LocalDate endDate = targetDate.withDayOfMonth(1).minusDays(1);
+
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+        List<Object[]> aggregates = orderRepository.aggregateByUserAndCategoryBetween(startDateTime, endDateTime);
+
+        Map<Long, Map<Long, OrderCountAndAmount>> statMap = new HashMap<>();
+
+        for (Object[] row : aggregates) {
+            Long userId = (Long) row[0];
+            Long categoryId = (Long) row[1];
+            Long count = ((Number) row[2]).longValue();
+            BigDecimal amount = (BigDecimal) row[3];
+
+            Map<Long, OrderCountAndAmount> categoryMap = statMap.computeIfAbsent(userId, k -> new HashMap<>());
+            categoryMap.put(categoryId, new OrderCountAndAmount(count, amount));
+        }
+
+        return statMap;
     }
 
 } 

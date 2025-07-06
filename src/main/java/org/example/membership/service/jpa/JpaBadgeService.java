@@ -1,9 +1,10 @@
 package org.example.membership.service.jpa;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.Badge;
-import org.example.membership.entity.Category;
 import org.example.membership.entity.User;
 import org.example.membership.repository.jpa.BadgeRepository;
 import org.springframework.stereotype.Service;
@@ -16,10 +17,14 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-public class BadgeService {
+public class JpaBadgeService {
 
     private final BadgeRepository badgeRepository;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Transactional
     public List<Badge> updateBadgeStatesForUser(User user, Map<Long, OrderCountAndAmount> statsByCategory) {
         if (statsByCategory == null) {
             statsByCategory = Collections.emptyMap();
@@ -47,4 +52,33 @@ public class BadgeService {
 
         return modifiedBadges;
     }
+
+    @Transactional
+    public void bulkUpdateBadgeStates(List<User> users,
+                                      Map<Long, Map<Long, OrderCountAndAmount>> statMap,
+                                      int batchSize) {
+        int count = 0;
+
+        for (User user : users) {
+            Map<Long, OrderCountAndAmount> stats = statMap.get(user.getId());
+            List<Badge> modifiedBadges = updateBadgeStatesForUser(user, stats);
+
+            for (Badge badge : modifiedBadges) {
+                badgeRepository.save(badge);
+                count++;
+                flushAndClearIfNeeded(count, batchSize);
+            }
+        }
+
+        entityManager.flush();
+        entityManager.clear();
+    }
+
+    private void flushAndClearIfNeeded(int count, int batchSize) {
+        if (count % batchSize == 0) {
+            entityManager.flush();
+            entityManager.clear();
+        }
+    }
+
 }

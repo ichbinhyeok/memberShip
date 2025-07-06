@@ -1,63 +1,65 @@
 package org.example.membership.service.jpa;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
+import org.example.membership.entity.Badge;
+import org.example.membership.entity.Category;
+import org.example.membership.entity.MembershipLog;
 import org.example.membership.entity.User;
-import org.example.membership.repository.jpa.UserRepository;
-import org.example.membership.repository.jpa.CategoryRepository;
+import org.example.membership.exception.NotFoundException;
+import org.example.membership.repository.jpa.*;
 import org.example.membership.dto.CreateUserRequest;
 import org.example.membership.dto.MembershipInfoResponse;
-import org.example.membership.exception.NotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class JpaMembershipService {
     private final UserRepository userRepository;
-    private final org.example.membership.repository.jpa.BadgeRepository badgeRepository;
-    private final org.example.membership.repository.jpa.CouponIssueLogRepository couponIssueLogRepository;
+    private final BadgeRepository badgeRepository;
+    private final CouponIssueLogRepository couponIssueLogRepository;
     private final CategoryRepository categoryRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Transactional
     public User createUser(CreateUserRequest request) {
         User user = new User();
         user.setName(request.getName());
 
-        // 명시적으로 null 체크 → 기본값 유지
         if (request.getMembershipLevel() != null) {
             user.setMembershipLevel(request.getMembershipLevel());
         }
         user = userRepository.save(user);
 
-        // create badge skeletons for all categories
-        List<org.example.membership.entity.Category> categories = categoryRepository.findAll();
-        java.util.List<org.example.membership.entity.Badge> badges = new java.util.ArrayList<>();
-        for (org.example.membership.entity.Category category : categories) {
-            org.example.membership.entity.Badge badge = new org.example.membership.entity.Badge();
+        List<Category> categories = categoryRepository.findAll();
+        List<Badge> badges = new ArrayList<>();
+        for (Category category : categories) {
+            Badge badge = new Badge();
             badge.setUser(user);
             badge.setCategory(category);
             badge.setActive(false);
             badges.add(badge);
         }
         badgeRepository.saveAll(badges);
-
         return user;
     }
 
-
-
     @Transactional(readOnly = true)
     public User getUserById(Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("User not found"));
+        return userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
     }
+
     @Transactional(readOnly = true)
     public MembershipInfoResponse getUserByName(String name) {
-      User user = userRepository.findByName(name).orElseThrow(() -> new NotFoundException("User not found"));
-
+        User user = userRepository.findByName(name).orElseThrow(() -> new NotFoundException("User not found"));
         return MembershipInfoResponse.from(user);
     }
 
@@ -89,12 +91,71 @@ public class JpaMembershipService {
         org.example.membership.dto.UserStatusResponse resp = new org.example.membership.dto.UserStatusResponse();
         resp.setUserId(user.getId());
         resp.setMembershipLevel(user.getMembershipLevel());
-        java.util.List<String> badges = badgeRepository.findByUser(user).stream()
+        List<String> badges = badgeRepository.findByUser(user).stream()
                 .map(b -> b.getCategory().getName().name())
                 .toList();
         resp.setBadges(badges);
         return resp;
     }
 
+    public MembershipLevel calculateLevel(long badgeCount) {
+        if (badgeCount >= 3) return MembershipLevel.VIP;
+        if (badgeCount == 2) return MembershipLevel.GOLD;
+        if (badgeCount == 1) return MembershipLevel.SILVER;
+        return MembershipLevel.NONE;
+    }
 
+    @Transactional
+    public void bulkUpdateMembershipLevelsAndLog(List<User> users,
+                                                 Map<Long, Long> activeBadgeMap,
+                                                 int batchSize) {
+        Map<Long, MembershipLevel> prevLevelMap = new HashMap<>();
+        int count = 0;
+
+        // 1차 루프: 등급 갱신 및 이전 등급 캐싱
+        for (User user : users) {
+            long badgeCount = activeBadgeMap.getOrDefault(user.getId(), 0L);
+            MembershipLevel prev = user.getMembershipLevel();
+            MembershipLevel newLevel = calculateLevel(badgeCount);
+
+            user.setMembershipLevel(newLevel);
+            user.setLastMembershipChange(LocalDateTime.now());
+            prevLevelMap.put(user.getId(), prev);
+
+            count++;
+            flushAndClearIfNeeded(count, batchSize);
+        }
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // 2차 루프: 로그 삽입
+        count = 0;
+        for (User user : users) {
+            MembershipLevel prev = prevLevelMap.get(user.getId());
+            MembershipLevel current = user.getMembershipLevel();
+            long badgeCount = activeBadgeMap.getOrDefault(user.getId(), 0L);
+
+            MembershipLog log = new MembershipLog();
+            log.setUser(user);
+            log.setPreviousLevel(prev);
+            log.setNewLevel(current);
+            log.setChangeReason("badge count: " + badgeCount);
+
+            entityManager.persist(log);
+
+            count++;
+            flushAndClearIfNeeded(count, batchSize);
+        }
+
+        entityManager.flush();
+        entityManager.clear();
+    }
+
+    private void flushAndClearIfNeeded(int count, int batchSize) {
+        if (count % batchSize == 0) {
+            entityManager.flush();
+            entityManager.clear();
+        }
+    }
 }

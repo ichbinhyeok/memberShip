@@ -13,4 +13,5 @@ public interface CouponIssueLogRepository extends JpaRepository<CouponIssueLog, 
     List<CouponIssueLog> findByUser(User user);
     int countByUserAndCoupon(User user, Coupon coupon);
 
+    List<CouponIssueLog> findAllByUserIn(List<User> users);
 }

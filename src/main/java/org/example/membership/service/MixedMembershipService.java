@@ -1,7 +1,6 @@
 package org.example.membership.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.membership.service.jpa.JpaMembershipRenewalService;
 import org.example.membership.service.mybatis.MyBatisMembershipRenewalService;
 import org.springframework.stereotype.Service;
 

@@ -1,60 +1,60 @@
 package org.example.membership.controller;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.dto.CreateUserRequest;
 import org.example.membership.dto.MembershipInfoResponse;
-import org.example.membership.dto.UserResponse;
 import org.example.membership.dto.UserStatusResponse;
+import org.example.membership.entity.User;
 import org.example.membership.service.jpa.JpaMembershipService;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Tag(name = "멤버십 관리", description = "사용자 등록 및 조회 API")
 @RestController
-@RequestMapping("/users")
 @RequiredArgsConstructor
+@RequestMapping("/users")
 public class UserController {
 
-    private final JpaMembershipService membershipService;
+    private final JpaMembershipService jpaMembershipService;
 
-    @Operation(summary = "사용자 멤버십 조회")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "조회 성공")})
-    @GetMapping("/{id}/membership")
-    public ResponseEntity<MembershipInfoResponse> getUserMembership(
-            @Parameter(description = "사용자 ID", required = true) @PathVariable("id") Long userId) {
-        return ResponseEntity.ok(MembershipInfoResponse.from(membershipService.getUserById(userId)));
+    @PostMapping
+    public User createUser(@RequestBody CreateUserRequest request) {
+        return jpaMembershipService.createUser(request);
     }
 
-    @Operation(summary = "사용자 이름으로 멤버십 조회")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "조회 성공")})
-    @GetMapping("/name/{userName}/membership")
-    public ResponseEntity<MembershipInfoResponse> getUserMembershipByName(
-            @Parameter(description = "사용자 이름", required = true) @PathVariable("userName") String userName) {
-        return ResponseEntity.ok(membershipService.getUserByName(userName));
+    @GetMapping
+    public List<User> getAllUsers() {
+        return jpaMembershipService.getAllUsers();
     }
 
-    @Operation(summary = "사용자 생성")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "생성 성공")})
-    @PostMapping("/create")
-    public ResponseEntity<UserResponse> createUser(
-            @Valid @RequestBody CreateUserRequest request) {
-        return ResponseEntity.ok(UserResponse.from(membershipService.createUser(request)));
+    @GetMapping("/{id}")
+    public User getUserById(@PathVariable Long id) {
+        return jpaMembershipService.getUserById(id);
     }
 
-    @Operation(summary = "사용자 상태 조회")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "조회 성공")})
+    @GetMapping("/name/{name}")
+    public MembershipInfoResponse getUserByName(@PathVariable String name) {
+        return jpaMembershipService.getUserByName(name);
+    }
+
+    @PatchMapping("/{id}/level")
+    public User updateLevel(@PathVariable Long id, @RequestParam MembershipLevel level) {
+        return jpaMembershipService.updateMembershipLevel(id, level);
+    }
+
     @GetMapping("/{id}/status")
-    public ResponseEntity<UserStatusResponse> getStatus(@PathVariable("id") Long userId) {
-        return ResponseEntity.ok(membershipService.getUserStatus(userId));
+    public UserStatusResponse getUserStatus(@PathVariable Long id) {
+        return jpaMembershipService.getUserStatus(id);
     }
 
+    @GetMapping("/level/{level}")
+    public List<User> getUsersByLevel(@PathVariable MembershipLevel level) {
+        return jpaMembershipService.getUsersByMembershipLevel(level);
+    }
 
+    @DeleteMapping("/{id}")
+    public void deleteUser(@PathVariable Long id) {
+        jpaMembershipService.deleteUser(id);
+    }
 }
