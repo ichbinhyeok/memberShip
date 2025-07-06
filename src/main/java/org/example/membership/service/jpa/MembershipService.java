@@ -28,6 +28,21 @@ public class MembershipService {
         return prev;
     }
 
+    /**
+     * 대량 처리 시 badge count를 외부에서 주입받아 등급을 갱신함
+     * 쿼리 부하를 방지하고 성능을 최적화하기 위한 전용 메서드
+     */
+    @Transactional
+    public MembershipLevel updateUserLevelWithBadgeCount(User user, long badgeCount) {
+        MembershipLevel prev = user.getMembershipLevel();
+        MembershipLevel newLevel = calculateLevel(badgeCount);
+        user.setMembershipLevel(newLevel);
+        user.setLastMembershipChange(LocalDateTime.now());
+        return prev;
+    }
+
+
+
     public MembershipLevel calculateLevel(long badgeCount) {
         if (badgeCount >= 3) {
             return MembershipLevel.VIP;

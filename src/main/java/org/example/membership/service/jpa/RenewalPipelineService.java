@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.Badge;
+import org.example.membership.entity.MembershipLog;
 import org.example.membership.entity.User;
 import org.example.membership.repository.jpa.BadgeRepository;
 import org.example.membership.repository.jpa.OrderRepository;
@@ -20,6 +21,7 @@ import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -92,37 +94,122 @@ public class RenewalPipelineService {
     @Transactional
     public void runLevelOnly() {
         List<User> users = userRepository.findAll();
+
+        Map<Long, Long> activeBadgeMap = badgeRepository.countActiveBadgesGroupedByUserId()
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> ((Number) row[0]).longValue(), // user_id
+                        row -> ((Number) row[1]).longValue()  // count
+                ));
+
+        final int BATCH_SIZE = 1000;
+        int count = 0;
+
         for (User user : users) {
-            membershipService.updateUserLevel(user);
+            long activeCount = activeBadgeMap.getOrDefault(user.getId(), 0L);
+            MembershipLevel prev = user.getMembershipLevel();
+            MembershipLevel newLevel = membershipService.calculateLevel(activeCount);
+
+            user.setMembershipLevel(newLevel);
+            user.setLastMembershipChange(LocalDateTime.now());
+            userRepository.save(user);
+
+            count++;
+            flushAndClearIfNeeded(count, BATCH_SIZE);
         }
+
+        entityManager.flush();
+        entityManager.clear();
     }
+
+
 
     @Transactional
     public void runLogOnly() {
         List<User> users = userRepository.findAll();
+        final int BATCH_SIZE = 1000;
+        int count = 0;
+
         for (User user : users) {
             membershipLogService.insertMembershipLog(user, user.getMembershipLevel());
+            count++;
+            flushAndClearIfNeeded(count, BATCH_SIZE);
         }
+
+        entityManager.flush();
+        entityManager.clear();
     }
+
 
     @Transactional
     public void runLevelAndLog() {
         List<User> users = userRepository.findAll();
 
+        //  사용자별 활성 배지 수 캐싱
+        Map<Long, Long> activeBadgeMap = badgeRepository.countActiveBadgesGroupedByUserId()
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> ((Number) row[0]).longValue(), // user_id
+                        row -> ((Number) row[1]).longValue()  // count
+                ));
+
+        //  이전 등급 캐싱: userId → prevLevel
+        Map<Long, MembershipLevel> prevLevelMap = new HashMap<>();
+
+        final int BATCH_SIZE = 1000;
+        int count = 0;
+
         long updateTotalTime = 0L;
         long insertTotalTime = 0L;
 
+        // 1차 루프: 등급 갱신 + 이전 등급 캐싱 (→ UPDATE batching 유도)
         for (User user : users) {
-            MembershipLevel previous = user.getMembershipLevel();
+            long badgeCount = activeBadgeMap.getOrDefault(user.getId(), 0L);
 
             long updateStart = System.currentTimeMillis();
-            MembershipLevel newLevel = membershipService.updateUserLevel(user); // 변경 수행
+
+            MembershipLevel prevLevel = user.getMembershipLevel();
+            MembershipLevel newLevel = membershipService.calculateLevel(badgeCount);
+
+            user.setMembershipLevel(newLevel);
+            user.setLastMembershipChange(LocalDateTime.now());
+
+            prevLevelMap.put(user.getId(), prevLevel);
+
             updateTotalTime += System.currentTimeMillis() - updateStart;
 
-            long insertStart = System.currentTimeMillis();
-            membershipLogService.insertMembershipLog(user, previous); // 변경 전 등급으로 로그 기록
-            insertTotalTime += System.currentTimeMillis() - insertStart;
+            count++;
+            flushAndClearIfNeeded(count, BATCH_SIZE);
         }
+
+        entityManager.flush();
+        entityManager.clear();
+
+        //  2차 루프: 로그 기록 (→ INSERT batching 유도)
+        count = 0;
+
+        for (User user : users) {
+            long insertStart = System.currentTimeMillis();
+
+            MembershipLevel prev = prevLevelMap.get(user.getId());
+            MembershipLevel current = user.getMembershipLevel(); // 이미 변경된 값
+
+            MembershipLog log = new MembershipLog();
+            log.setUser(user); // detach 상태여도 ID는 유효
+            log.setPreviousLevel(prev);
+            log.setNewLevel(current);
+            log.setChangeReason("badge count: " + activeBadgeMap.getOrDefault(user.getId(), 0L));
+
+            entityManager.persist(log);
+
+            insertTotalTime += System.currentTimeMillis() - insertStart;
+
+            count++;
+            flushAndClearIfNeeded(count, BATCH_SIZE);
+        }
+
+        entityManager.flush();
+        entityManager.clear();
 
         System.out.println("등급 업데이트 총 소요 시간: " + updateTotalTime + "ms");
         System.out.println("로그 insert 총 소요 시간: " + insertTotalTime + "ms");
@@ -132,10 +219,9 @@ public class RenewalPipelineService {
     @Transactional
     public void runCouponOnly() {
         List<User> users = userRepository.findAll();
-        for (User user : users) {
-            couponService.issueCoupons(user);
-        }
+        couponService.bulkIssueCoupons(users, 1000);
     }
+
 
 
 
@@ -148,6 +234,14 @@ public class RenewalPipelineService {
             var prev = membershipService.updateUserLevel(user);
             membershipLogService.insertMembershipLog(user, prev);
             couponService.issueCoupons(user); // 내부에서 로그 기록까지 수행
+        }
+    }
+
+
+    private void flushAndClearIfNeeded(int count, int batchSize) {
+        if (count % batchSize == 0) {
+            entityManager.flush();
+            entityManager.clear();
         }
     }
 
