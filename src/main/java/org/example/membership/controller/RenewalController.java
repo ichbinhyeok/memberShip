@@ -6,6 +6,13 @@ import lombok.RequiredArgsConstructor;
 import org.example.membership.service.jpa.JpaMembershipRenewalService;
 import org.example.membership.service.mybatis.MyBatisRenewalPipelineService;
 import org.example.membership.service.jpa.RenewalPipelineService;
+import org.example.membership.service.jpa.BadgeService;
+import org.example.membership.service.jpa.MembershipService;
+import org.example.membership.service.jpa.MembershipLogService;
+import org.example.membership.service.jpa.CouponService;
+import org.example.membership.service.mybatis.MyBatisBadgeService;
+import org.example.membership.service.mybatis.MyBatisMembershipService;
+import org.example.membership.service.mybatis.MyBatisCouponLogService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +29,13 @@ public class RenewalController {
     private final RenewalPipelineService renewalPipelineService;
     private final MyBatisRenewalPipelineService myBatisRenewalPipelineService;
     private final JpaMembershipRenewalService jpaMembershipRenewalService;
+    private final BadgeService badgeService;
+    private final MembershipService membershipService;
+    private final MembershipLogService membershipLogService;
+    private final CouponService couponService;
+    private final MyBatisBadgeService myBatisBadgeService;
+    private final MyBatisMembershipService myBatisMembershipService;
+    private final MyBatisCouponLogService myBatisCouponLogService;
 
     // --- JPA 기반 단계별 실행 ---
 
@@ -29,7 +43,7 @@ public class RenewalController {
     @PutMapping("/jpa/1-badge")
     public ResponseEntity<Void> badgeOnly() {
         long start = System.currentTimeMillis();
-        renewalPipelineService.runBadgeOnly(LocalDate.now());
+        badgeService.bulkUpdateBadgeStates(LocalDate.now());
         long end = System.currentTimeMillis();
         System.out.println("⏱ JPA 배지 갱신 소요 시간: " + (end - start) + "ms");
         return ResponseEntity.ok().build();
@@ -39,7 +53,7 @@ public class RenewalController {
     @PutMapping("/jpa/2-level")
     public ResponseEntity<Void> levelOnly() {
         long start = System.currentTimeMillis();
-        renewalPipelineService.runLevelOnly();
+        membershipService.bulkUpdateMembershipLevels();
         long end = System.currentTimeMillis();
         System.out.println("⏱ JPA 등급 갱신 소요 시간: " + (end - start) + "ms");
         return ResponseEntity.ok().build();
@@ -49,7 +63,7 @@ public class RenewalController {
     @PutMapping("/jpa/3-log")
     public ResponseEntity<Void> logOnly() {
         long start = System.currentTimeMillis();
-        renewalPipelineService.runLogOnly();
+        membershipLogService.bulkInsertMembershipLogs();
         long end = System.currentTimeMillis();
         System.out.println("⏱ JPA 로그 기록 소요 시간: " + (end - start) + "ms");
         return ResponseEntity.ok().build();
@@ -59,7 +73,7 @@ public class RenewalController {
     @PutMapping("/jpa/4-coupon")
     public ResponseEntity<Void> couponOnly() {
         long start = System.currentTimeMillis();
-        renewalPipelineService.runCouponOnly();
+        couponService.bulkIssueCouponsForAllUsers(1000);
         long end = System.currentTimeMillis();
         System.out.println("⏱ JPA 쿠폰 발급 소요 시간: " + (end - start) + "ms");
         return ResponseEntity.ok().build();
@@ -83,7 +97,7 @@ public class RenewalController {
     @PutMapping("/mybatis/1-badge")
     public ResponseEntity<Void> badgeOnlyMybatis() {
         long start = System.currentTimeMillis();
-        myBatisRenewalPipelineService.runBadgeOnly(LocalDate.now());
+        myBatisBadgeService.bulkUpdateBadgeStates(LocalDate.now());
         long end = System.currentTimeMillis();
         System.out.println("⏱ MyBatis 배지 갱신 소요 시간: " + (end - start) + "ms");
         return ResponseEntity.ok().build();
@@ -93,7 +107,7 @@ public class RenewalController {
     @PutMapping("/mybatis/2-level")
     public ResponseEntity<Void> levelOnlyMybatis() {
         long start = System.currentTimeMillis();
-        myBatisRenewalPipelineService.runLevelOnly();
+        myBatisMembershipService.bulkUpdateMembershipLevels();
         long end = System.currentTimeMillis();
         System.out.println("⏱ MyBatis 등급 갱신 소요 시간: " + (end - start) + "ms");
         return ResponseEntity.ok().build();
@@ -103,7 +117,7 @@ public class RenewalController {
     @PutMapping("/mybatis/3-log")
     public ResponseEntity<Void> logOnlyMybatis() {
         long start = System.currentTimeMillis();
-        myBatisRenewalPipelineService.runLogOnly();
+        myBatisMembershipService.bulkInsertMembershipLogs();
         long end = System.currentTimeMillis();
         System.out.println("⏱ MyBatis 로그 기록 소요 시간: " + (end - start) + "ms");
         return ResponseEntity.ok().build();
@@ -113,7 +127,7 @@ public class RenewalController {
     @PutMapping("/mybatis/4-coupon")
     public ResponseEntity<Void> couponOnlyMybatis() {
         long start = System.currentTimeMillis();
-        myBatisRenewalPipelineService.runCouponOnly();
+        myBatisCouponLogService.bulkIssueCouponsForAllUsers();
         long end = System.currentTimeMillis();
         System.out.println("⏱ MyBatis 쿠폰 발급 소요 시간: " + (end - start) + "ms");
         return ResponseEntity.ok().build();

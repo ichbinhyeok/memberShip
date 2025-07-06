@@ -63,82 +63,11 @@ public class RenewalPipelineService {
     }
 
 
-    @Transactional
-    public void runBadgeOnly(LocalDate targetDate) {
-        Map<Long, Map<Long, OrderCountAndAmount>> statMap = collectStats(targetDate);
-        List<User> users = userRepository.findAll();
-
-        final int BATCH_SIZE = 1000;
-        int count = 0;
-
-        for (User user : users) {
-            Map<Long, OrderCountAndAmount> stats = statMap.get(user.getId());
-            List<Badge> modifiedBadges = badgeService.updateBadgeStatesForUser(user, stats);
-
-            for (Badge badge : modifiedBadges) {
-                badgeRepository.save(badge); // 명시적 업데이트
-                count++;
-
-                if (count % BATCH_SIZE == 0) {
-                    entityManager.flush();
-                    entityManager.clear();
-                }
-            }
-        }
-
-        entityManager.flush();
-        entityManager.clear();
-    }
-
-
-    @Transactional
-    public void runLevelOnly() {
-        List<User> users = userRepository.findAll();
-
-        Map<Long, Long> activeBadgeMap = badgeRepository.countActiveBadgesGroupedByUserId()
-                .stream()
-                .collect(Collectors.toMap(
-                        row -> ((Number) row[0]).longValue(), // user_id
-                        row -> ((Number) row[1]).longValue()  // count
-                ));
-
-        final int BATCH_SIZE = 1000;
-        int count = 0;
-
-        for (User user : users) {
-            long activeCount = activeBadgeMap.getOrDefault(user.getId(), 0L);
-            MembershipLevel prev = user.getMembershipLevel();
-            MembershipLevel newLevel = membershipService.calculateLevel(activeCount);
-
-            user.setMembershipLevel(newLevel);
-            user.setLastMembershipChange(LocalDateTime.now());
-            userRepository.save(user);
-
-            count++;
-            flushAndClearIfNeeded(count, BATCH_SIZE);
-        }
-
-        entityManager.flush();
-        entityManager.clear();
-    }
 
 
 
-    @Transactional
-    public void runLogOnly() {
-        List<User> users = userRepository.findAll();
-        final int BATCH_SIZE = 1000;
-        int count = 0;
 
-        for (User user : users) {
-            membershipLogService.insertMembershipLog(user, user.getMembershipLevel());
-            count++;
-            flushAndClearIfNeeded(count, BATCH_SIZE);
-        }
 
-        entityManager.flush();
-        entityManager.clear();
-    }
 
 
     @Transactional
@@ -216,11 +145,6 @@ public class RenewalPipelineService {
     }
 
 
-    @Transactional
-    public void runCouponOnly() {
-        List<User> users = userRepository.findAll();
-        couponService.bulkIssueCoupons(users, 1000);
-    }
 
 
 

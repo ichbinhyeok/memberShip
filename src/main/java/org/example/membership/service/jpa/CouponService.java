@@ -12,6 +12,7 @@ import org.example.membership.entity.User;
 import org.example.membership.repository.jpa.BadgeRepository;
 import org.example.membership.repository.jpa.CouponIssueLogRepository;
 import org.example.membership.repository.jpa.CouponRepository;
+import org.example.membership.repository.jpa.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ public class CouponService {
     private final BadgeRepository badgeRepository;
     private final CouponRepository couponRepository;
     private final CouponIssueLogRepository couponIssueLogRepository;
+    private final UserRepository userRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -104,16 +106,26 @@ public class CouponService {
                     entityManager.persist(log);
 
                     count++;
-                    if (count % batchSize == 0) {
-                        entityManager.flush();
-                        entityManager.clear();
-                    }
+                    flushAndClearIfNeeded(count, batchSize);
                 }
             }
         }
 
         entityManager.flush();
         entityManager.clear();
+    }
+
+    @Transactional
+    public void bulkIssueCouponsForAllUsers(int batchSize) {
+        List<User> users = userRepository.findAll();
+        bulkIssueCoupons(users, batchSize);
+    }
+
+    private void flushAndClearIfNeeded(int count, int batchSize) {
+        if (count % batchSize == 0) {
+            entityManager.flush();
+            entityManager.clear();
+        }
     }
 
 
