@@ -7,8 +7,14 @@ import org.example.membership.repository.jpa.BadgeRepository;
 import org.example.membership.repository.jpa.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -16,6 +22,9 @@ public class MembershipService {
 
     private final UserRepository userRepository;
     private final BadgeRepository badgeRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Transactional
     public MembershipLevel updateUserLevel(User user) {
@@ -41,6 +50,35 @@ public class MembershipService {
         return prev;
     }
 
+    @Transactional
+    public void bulkUpdateMembershipLevels() {
+        List<User> users = userRepository.findAll();
+
+        Map<Long, Long> activeBadgeMap = badgeRepository.countActiveBadgesGroupedByUserId()
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> ((Number) row[0]).longValue(),
+                        row -> ((Number) row[1]).longValue()
+                ));
+
+        final int BATCH_SIZE = 1000;
+        int count = 0;
+
+        for (User user : users) {
+            long badgeCount = activeBadgeMap.getOrDefault(user.getId(), 0L);
+            MembershipLevel newLevel = calculateLevel(badgeCount);
+            user.setMembershipLevel(newLevel);
+            user.setLastMembershipChange(LocalDateTime.now());
+            userRepository.save(user);
+
+            count++;
+            flushAndClearIfNeeded(count, BATCH_SIZE);
+        }
+
+        entityManager.flush();
+        entityManager.clear();
+    }
+
 
 
     public MembershipLevel calculateLevel(long badgeCount) {
@@ -52,5 +90,12 @@ public class MembershipService {
             return MembershipLevel.SILVER;
         }
         return MembershipLevel.NONE;
+    }
+
+    private void flushAndClearIfNeeded(int count, int batchSize) {
+        if (count % batchSize == 0) {
+            entityManager.flush();
+            entityManager.clear();
+        }
     }
 }

@@ -65,30 +65,8 @@ public class MyBatisRenewalPipelineService {
     }
 
 
-    @Transactional
-    public void runBadgeOnly(LocalDate targetDate) {
-        Map<Long, Map<Long, OrderCountAndAmount>> statMap = collectStats(targetDate); // user_id->category_id-> {long count, BigDecimal Amount}
-        List<User> users = userMapper.findAll();
-        for (User user : users) {
-            badgeService.updateBadgeStatesForUser(user, statMap.get(user.getId()));
-        }
-    }
 
-    @Transactional
-    public void runLevelOnly() {
-        List<User> users = userMapper.findAll();
-        for (User user : users) {
-            updateMembershipLevel(user);
-        }
-    }
 
-    @Transactional
-    public void runLogOnly() {
-        List<User> users = userMapper.findAll();
-        for (User user : users) {
-            insertMembershipLog(user, user.getMembershipLevel());
-        }
-    }
 
 
     @Transactional
@@ -97,13 +75,6 @@ public class MyBatisRenewalPipelineService {
 
         long updateTotalTime = 0L;
         long insertTotalTime = 0L;
-
-        for (User user : users) {
-            MembershipLevel previous = user.getMembershipLevel();
-
-            long updateStart = System.currentTimeMillis();
-            updateMembershipLevel(user);
-            updateTotalTime += System.currentTimeMillis() - updateStart;
 
             long insertStart = System.currentTimeMillis();
             insertMembershipLog(user, previous);
@@ -115,13 +86,6 @@ public class MyBatisRenewalPipelineService {
     }
 
 
-    @Transactional
-    public void runCouponOnly() {
-        List<User> users = userMapper.findAll();
-        for (User user : users) {
-            issueCoupons(user);
-        }
-    }
 
 
 
@@ -137,13 +101,6 @@ public class MyBatisRenewalPipelineService {
 
         }
     }
-
-    private MembershipLevel updateMembershipLevel(User user) {
-        long activeCount = badgeMapper.countByUserIdAndActiveTrue(user.getId());
-        MembershipLevel previous = user.getMembershipLevel();
-        MembershipLevel newLevel = calculateLevel(activeCount);
-        user.setMembershipLevel(newLevel);
-        user.setLastMembershipChange(LocalDateTime.now());
         userMapper.update(user);
         return previous;
     }
