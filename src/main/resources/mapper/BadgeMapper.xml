@@ -19,6 +19,14 @@
         SELECT * FROM badges WHERE id = #{id}
     </select>
 
+    <select id="findByUserIds" resultMap="badgeResultMap" parameterType="list">
+        SELECT * FROM badges WHERE user_id IN
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+
     <select id="findByUserId" resultMap="badgeResultMap">
         SELECT * FROM badges WHERE user_id = #{userId}
     </select>

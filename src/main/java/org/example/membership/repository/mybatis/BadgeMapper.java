@@ -19,4 +19,6 @@ public interface BadgeMapper {
     boolean existsByUserIdAndCategoryId(@Param("userId") Long userId, @Param("categoryId") Long categoryId);
     void update(Badge badge);
     void deleteById(@Param("id") Long id);
+    List<Badge> findByUserIds(@Param("list") List<Long> userIds);
+
 }

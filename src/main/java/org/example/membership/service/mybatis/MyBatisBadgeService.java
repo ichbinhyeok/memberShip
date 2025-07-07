@@ -36,4 +36,45 @@ public class MyBatisBadgeService {
             badgeMapper.update(badge);
         }
     }
+    @Transactional
+    public void bulkUpdateBadgeStates(List<User> users,
+                                      Map<Long, Map<Long, OrderCountAndAmount>> statMap,
+                                      int batchSize) {
+        int count = 0;
+
+        for (User user : users) {
+            Map<Long, OrderCountAndAmount> stats = statMap.getOrDefault(user.getId(), Collections.emptyMap());
+            List<Badge> badges = badgeMapper.findByUserId(user.getId());
+
+            for (Badge badge : badges) {
+                OrderCountAndAmount stat = stats.get(badge.getCategory().getId());
+
+                boolean shouldBeActive = stat != null &&
+                        stat.getCount() >= 5 &&
+                        stat.getAmount().compareTo(new BigDecimal("300000")) >= 0;
+
+                if (badge.isActive() != shouldBeActive) {
+                    if (shouldBeActive) {
+                        badge.activate();
+                    } else {
+                        badge.deactivate();
+                    }
+                    badgeMapper.update(badge); // DB 반영
+                    count++;
+                }
+
+                if (count % batchSize == 0) {
+                    // MyBatis는 flush/clear 없음, 대신 연결 부하 완화용 로그 출력 가능
+                    System.out.println("Flushed " + count + " badge updates");
+                }
+            }
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public long countActiveBadgesByUserId(Long userId) {
+        return badgeMapper.countByUserIdAndActiveTrue(userId);
+    }
+
+
 }
