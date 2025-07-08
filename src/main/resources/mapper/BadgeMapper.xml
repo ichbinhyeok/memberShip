@@ -52,14 +52,44 @@
         VALUES (#{user.id}, #{category.id}, #{active}, #{updatedAt})
     </insert>
 
-    <update id="update" parameterType="org.example.membership.entity.Badge">
+    <update id="bulkUpdateBadgesCaseWhen" parameterType="list">
+        UPDATE badges
+        SET
+        user_id = CASE id
+        <foreach collection="list" item="b">
+            WHEN #{b.id} THEN #{b.user.id}
+        </foreach>
+        END,
+
+        category_id = CASE id
+        <foreach collection="list" item="b">
+            WHEN #{b.id} THEN #{b.category.id}
+        </foreach>
+        END,
+
+        active = CASE id
+        <foreach collection="list" item="b">
+            WHEN #{b.id} THEN #{b.active}
+        </foreach>
+        END,
+
+        updated_at = NOW()
+        WHERE id IN
+        <foreach collection="list" item="b" open="(" separator="," close=")">
+            #{b.id}
+        </foreach>
+    </update>
+
+
+        <update id="update" parameterType="org.example.membership.entity.Badge">
         UPDATE badges
         SET user_id = #{user.id},
             category_id = #{category.id},
             active = #{active},
-            updated_at = #{updatedAt}
+            updated_at = NOW()
         WHERE id = #{id}
     </update>
+
 
     <delete id="deleteById">
         DELETE FROM badges WHERE id = #{id}

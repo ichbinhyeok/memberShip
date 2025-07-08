@@ -1,3 +1,6 @@
+server:
+  port: 8080
+
 spring:
   datasource:
     driver-class-name: com.p6spy.engine.spy.P6SpyDriver
@@ -7,51 +10,46 @@ spring:
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
-      idle-timeout: 300000 # 5분 (300000ms)
-      connection-timeout: 20000 # 20초 (20000ms)
-      max-lifetime: 1200000 # 20분 (1200000ms)
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
 
   jpa:
     hibernate:
-      ddl-auto: update # 개발 환경에서만 권장, 프로덕션에서는 'none' 및 마이그레이션 도구 사용
-    show-sql: true
+      ddl-auto: update
+    show-sql: false  # Hibernate SQL 로그 끔
     properties:
       hibernate:
         jdbc:
-          batch_size: 5000   # ✅ 몇 건씩 묶을지 (성능에 따라 조정)
+          batch_size: 5000
         format_sql: true
-        dialect: org.hibernate.dialect.MySQL8Dialect # MySQL 8 버전에 맞는 방언
+        dialect: org.hibernate.dialect.MySQL8Dialect
 
   batch:
     job:
-      enabled: false # Spring Batch Job 자동 실행 비활성화
+      enabled: false
     jdbc:
-      initialize-schema: always # Spring Batch 메타데이터 테이블 초기화 (개발 환경에서 편리)
-
-server:
-  port: 8080 # 애플리케이션이 실행될 포트
+      initialize-schema: always
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus # Actuator 엔드포인트 노출 설정
-  prometheus: # Spring Boot 3.x 이상에서 권장되는 Prometheus 설정 위치
-    metrics:
-      export:
-        enabled: true # Prometheus 메트릭 내보내기 활성화
+        include: health,info
 
 logging:
   level:
-    org.mybatis: DEBUG
-    org.apache.ibatis: DEBUG
-    org.apache.ibatis.executor.BatchExecutor: DEBUG # ✅ 이걸 꼭 넣어야 실제 배치 insert 로그가 찍힘
-    org.springframework.jdbc.core: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
-    org.hibernate.engine.jdbc.batch.internal.BatchingBatch: DEBUG
-
+    root: INFO
+    p6spy: INFO
+    org.mybatis: INFO
+    org.apache.ibatis: INFO
+    org.apache.ibatis.executor.BatchExecutor: DEBUG # 핵심! 실제 배치 수행 로그 확인용
+    org.springframework.jdbc.core: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+    org.hibernate.engine.jdbc.batch.internal.BatchingBatch: WARN
 
 mybatis:
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 로그 과다 시 주석 처리

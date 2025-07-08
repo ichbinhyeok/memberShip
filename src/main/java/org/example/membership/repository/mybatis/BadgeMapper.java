@@ -21,4 +21,5 @@ public interface BadgeMapper {
     void deleteById(@Param("id") Long id);
     List<Badge> findByUserIds(@Param("list") List<Long> userIds);
 
+    void bulkUpdateBadgesCaseWhen(List<Badge> chunk);
 }
