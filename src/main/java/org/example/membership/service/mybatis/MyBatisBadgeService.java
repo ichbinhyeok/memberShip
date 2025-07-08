@@ -6,6 +6,7 @@ import org.apache.ibatis.session.ExecutorType;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.example.membership.dto.OrderCountAndAmount;
+import org.example.membership.dto.UserBadgeCount;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.User;
 import org.example.membership.repository.mybatis.BadgeMapper;
@@ -15,10 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -81,7 +79,7 @@ public void bulkUpdateBadgeStates(List<User> users,
 
                 boolean shouldBeActive = stat != null &&
                         stat.getCount() >= 3 &&
-                        stat.getAmount().compareTo(new BigDecimal("100000")) >= 0;
+                        stat.getAmount().compareTo(new BigDecimal("300000")) >= 0;
 
                 if (badge.isActive() != shouldBeActive) {
                     if (shouldBeActive) {
@@ -121,6 +119,19 @@ public void bulkUpdateBadgeStates(List<User> users,
     public long countActiveBadgesByUserId(Long userId) {
         return badgeMapper.countByUserIdAndActiveTrue(userId);
     }
+
+    @Transactional(readOnly = true)
+    public Map<Long, Long> countActiveBadgesForUsers(List<Long> userIds) {
+        List<UserBadgeCount> list = badgeMapper.countActiveBadgesForUsers(userIds);
+
+        Map<Long, Long> result = new HashMap<>();
+        for (UserBadgeCount item : list) {
+            result.put(item.getUserId(), item.getBadgeCount());
+        }
+
+        return result;
+    }
+
 
 
 }

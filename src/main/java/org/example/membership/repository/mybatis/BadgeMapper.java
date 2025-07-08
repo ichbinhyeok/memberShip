@@ -2,7 +2,11 @@ package org.example.membership.repository.mybatis;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.example.membership.dto.UserBadgeCount;
 import org.example.membership.entity.Badge;
+import java.util.Map;
+import org.apache.ibatis.annotations.MapKey;
+
 
 import java.util.List;
 
@@ -20,6 +24,9 @@ public interface BadgeMapper {
     void update(Badge badge);
     void deleteById(@Param("id") Long id);
     List<Badge> findByUserIds(@Param("list") List<Long> userIds);
+
+    List<UserBadgeCount> countActiveBadgesForUsers(@Param("list") List<Long> userIds);
+
 
     void bulkUpdateBadgesCaseWhen(List<Badge> chunk);
 }

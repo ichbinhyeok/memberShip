@@ -198,14 +198,18 @@ public class BatchController {
 
     private void runMyBatisUserLevelBatch(List<User> users, int batchSize) {
         Instant start = Instant.now();
-        Map<Long, Long> activeBadgeMap = users.stream()
-                .collect(Collectors.toMap(
-                        User::getId,
-                        user -> myBatisBadgeService.countActiveBadgesByUserId(user.getId())
-                ));
+
+        List<Long> userIds = users.stream()
+                .map(User::getId)
+                .collect(Collectors.toList());
+
+        Map<Long, Long> activeBadgeMap = myBatisBadgeService.countActiveBadgesForUsers(userIds);
+
         myBatisMembershipService.bulkUpdateMembershipLevelsAndLog(users, activeBadgeMap, batchSize);
+
         log.info("[MyBatis 3] 사용자 등급 갱신 완료: {}ms", Duration.between(start, Instant.now()).toMillis());
     }
+
 
     private void runMyBatisCouponBatch(List<User> users, int batchSize) {
         Instant start = Instant.now();

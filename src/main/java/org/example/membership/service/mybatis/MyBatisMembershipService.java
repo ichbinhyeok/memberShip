@@ -1,7 +1,9 @@
 package org.example.membership.service.mybatis;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.membership.common.enums.MembershipLevel;
+import org.example.membership.dto.MembershipLogRequest;
 import org.example.membership.entity.MembershipLog;
 import org.example.membership.entity.User;
 import org.example.membership.repository.mybatis.MembershipLogMapper;
@@ -13,9 +15,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MyBatisMembershipService {
@@ -86,7 +90,11 @@ public class MyBatisMembershipService {
     public void bulkUpdateMembershipLevelsAndLog(List<User> users,
                                                  Map<Long, Long> activeBadgeCountMap,
                                                  int batchSize) {
-        int count = 0;
+
+        List<User> userBuffer = new ArrayList<>();
+        List<MembershipLogRequest> logBuffer = new ArrayList<>();
+
+        LocalDateTime now = LocalDateTime.now();
 
         for (User user : users) {
             long badgeCount = activeBadgeCountMap.getOrDefault(user.getId(), 0L);
@@ -94,22 +102,36 @@ public class MyBatisMembershipService {
             MembershipLevel newLevel = calculateLevel(badgeCount);
 
             user.setMembershipLevel(newLevel);
-            user.setLastMembershipChange(LocalDateTime.now());
-            userMapper.update(user);
+            user.setLastMembershipChange(now);
+            userBuffer.add(user);
 
-            MembershipLog log = new MembershipLog();
-            log.setUser(user);
-            log.setPreviousLevel(prev);
-            log.setNewLevel(newLevel);
-            log.setChangeReason("badge count: " + badgeCount);
-            membershipLogMapper.insert(log);
-
-            count++;
-            if (count % batchSize == 0) {
-                System.out.println("Flushed " + count + " user updates");
-            }
+            MembershipLogRequest log = new MembershipLogRequest(
+                    user.getId(),
+                    prev,
+                    newLevel,
+                    "badge count: " + badgeCount,
+                    now
+            );
+            logBuffer.add(log);
         }
+
+        //  1. 사용자 등급 업데이트 (batchSize 단위)
+        for (int i = 0; i < userBuffer.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, userBuffer.size());
+            List<User> chunk = userBuffer.subList(i, end);
+            userMapper.bulkUpdateMembershipLevels(chunk);
+        }
+
+        //  2. 로그 일괄 insert (batchSize 단위)
+        for (int i = 0; i < logBuffer.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, logBuffer.size());
+            List<MembershipLogRequest> chunk = logBuffer.subList(i, end);
+            membershipLogMapper.bulkInsertRequests(chunk);
+        }
+
+        log.info("MyBatis 등급 갱신 + 로그 저장 완료. 총 사용자 수: {}, 배치 사이즈: {}", users.size(), batchSize);
     }
+
     public MembershipLevel calculateLevel(long badgeCount) {
         if (badgeCount >= 3) return MembershipLevel.VIP;
         if (badgeCount == 2) return MembershipLevel.GOLD;

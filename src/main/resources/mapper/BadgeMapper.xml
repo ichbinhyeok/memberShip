@@ -43,6 +43,20 @@
         SELECT COUNT(*) FROM badges WHERE user_id = #{userId} AND active = TRUE
     </select>
 
+    <select id="countActiveBadgesForUsers" resultType="org.example.membership.dto.UserBadgeCount">
+        SELECT user_id AS userId, COUNT(*) AS badgeCount
+        FROM badges
+        WHERE active = TRUE
+        AND user_id IN
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        GROUP BY user_id
+    </select>
+
+
+
+
     <select id="existsByUserIdAndCategoryId" resultType="boolean">
         SELECT COUNT(*) > 0 FROM badges WHERE user_id = #{userId} AND category_id = #{categoryId}
     </select>
