@@ -287,7 +287,7 @@ public class FastDataGenerationService {
 
     private BigDecimal generateRandomPrice() {
         return BigDecimal.valueOf(
-                ThreadLocalRandom.current().nextInt(10, 151) * 1000
+                ThreadLocalRandom.current().nextInt(10, 51) * 1000
         );
     }
 

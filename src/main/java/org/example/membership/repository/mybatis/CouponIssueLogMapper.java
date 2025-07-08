@@ -12,6 +12,8 @@ import java.util.Map;
 @Mapper
 public interface CouponIssueLogMapper {
     void insert(CouponIssueLog log);
+    void insertAll(@Param("list") List<CouponIssueLog> logs); //
+
     CouponIssueLog findById(@Param("id") Long id);
     List<CouponIssueLog> findByUserId(@Param("userId") Long userId);
     List<CouponIssueLog> findAll();

@@ -18,13 +18,7 @@
         FROM coupon_issue_log
         WHERE user_id = #{userId} AND coupon_id = #{couponId}
     </select>
-
-<!--    <select id="countIssuedPerUserAndCoupon" resultType="map">-->
-<!--        SELECT CONCAT(user_id, '-', coupon_id) AS userCouponKey, COUNT(*) AS count-->
-<!--        FROM coupon_issue_logs-->
-<!--        GROUP BY user_id, coupon_id-->
-<!--    </select>-->
-
+    
 
 
     <select id="findById" resultMap="logResultMap">

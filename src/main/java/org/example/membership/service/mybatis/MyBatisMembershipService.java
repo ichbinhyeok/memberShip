@@ -2,6 +2,9 @@ package org.example.membership.service.mybatis;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.session.ExecutorType;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.dto.MembershipLogRequest;
 import org.example.membership.entity.MembershipLog;
@@ -25,6 +28,9 @@ import java.util.Map;
 public class MyBatisMembershipService {
     private final UserMapper userMapper;
     private final MembershipLogMapper membershipLogMapper;
+
+    private final SqlSessionFactory sqlSessionFactory;
+
 
     @Transactional
     public User createUser(CreateUserRequest request) {
@@ -86,14 +92,13 @@ public class MyBatisMembershipService {
     public List<User> getUsersByMembershipLevel(MembershipLevel level) {
         return userMapper.findByMembershipLevel(level);
     }
-    @Transactional
+    //@Transactional
     public void bulkUpdateMembershipLevelsAndLog(List<User> users,
                                                  Map<Long, Long> activeBadgeCountMap,
                                                  int batchSize) {
 
         List<User> userBuffer = new ArrayList<>();
         List<MembershipLogRequest> logBuffer = new ArrayList<>();
-
         LocalDateTime now = LocalDateTime.now();
 
         for (User user : users) {
@@ -115,27 +120,36 @@ public class MyBatisMembershipService {
             logBuffer.add(log);
         }
 
-        //  1. 사용자 등급 업데이트 (batchSize 단위)
-        for (int i = 0; i < userBuffer.size(); i += batchSize) {
-            int end = Math.min(i + batchSize, userBuffer.size());
-            List<User> chunk = userBuffer.subList(i, end);
-            userMapper.bulkUpdateMembershipLevels(chunk);
-        }
+        // ✅ MyBatis 배치 세션 열기
+        try (SqlSession session = sqlSessionFactory.openSession(ExecutorType.BATCH, false)) {
+            UserMapper userMapper = session.getMapper(UserMapper.class);
+            MembershipLogMapper membershipLogMapper = session.getMapper(MembershipLogMapper.class);
 
-        //  2. 로그 일괄 insert (batchSize 단위)
-        for (int i = 0; i < logBuffer.size(); i += batchSize) {
-            int end = Math.min(i + batchSize, logBuffer.size());
-            List<MembershipLogRequest> chunk = logBuffer.subList(i, end);
-            membershipLogMapper.bulkInsertRequests(chunk);
+            for (int i = 0; i < userBuffer.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, userBuffer.size());
+                List<User> chunk = userBuffer.subList(i, end);
+                userMapper.bulkUpdateMembershipLevels(chunk);
+                session.flushStatements(); // 🔥 JDBC executeBatch()
+            }
+
+            for (int i = 0; i < logBuffer.size(); i += batchSize) {
+                int end = Math.min(i + batchSize, logBuffer.size());
+                List<MembershipLogRequest> chunk = logBuffer.subList(i, end);
+                membershipLogMapper.bulkInsertRequests(chunk);
+                session.flushStatements();
+            }
+
+            session.commit(); // ✅ 트랜잭션 커밋
         }
 
         log.info("MyBatis 등급 갱신 + 로그 저장 완료. 총 사용자 수: {}, 배치 사이즈: {}", users.size(), batchSize);
     }
 
+
     public MembershipLevel calculateLevel(long badgeCount) {
         if (badgeCount >= 3) return MembershipLevel.VIP;
-        if (badgeCount == 2) return MembershipLevel.GOLD;
-        if (badgeCount == 1) return MembershipLevel.SILVER;
+        if (badgeCount >= 2) return MembershipLevel.GOLD;
+        if (badgeCount >= 1) return MembershipLevel.SILVER;
         return MembershipLevel.NONE;
     }
 } 
