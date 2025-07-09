@@ -6,10 +6,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import org.example.membership.common.CouponAmountConverter;
+import org.example.membership.common.util.CouponAmountConverter;
 import org.example.membership.common.enums.CouponAmount;
 
 @Entity

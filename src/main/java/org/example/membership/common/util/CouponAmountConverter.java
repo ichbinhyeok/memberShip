@@ -1,4 +1,4 @@
-package org.example.membership.common;
+package org.example.membership.common.util;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
