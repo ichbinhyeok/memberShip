@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import javax.sql.DataSource;
+import java.util.UUID;
 
 @Configuration
 @MapperScan(basePackages = {
@@ -21,8 +22,18 @@ public class MyBatisConfig {
         SqlSessionFactoryBean sessionFactory = new SqlSessionFactoryBean();
         sessionFactory.setDataSource(dataSource);
         sessionFactory.setMapperLocations(
-            new PathMatchingResourcePatternResolver().getResources("classpath:mapper/*.xml")
+                new PathMatchingResourcePatternResolver().getResources("classpath:mapper/*.xml")
         );
+
+        // MyBatis Configuration 설정
+        org.apache.ibatis.session.Configuration configuration = new org.apache.ibatis.session.Configuration();
+        configuration.setMapUnderscoreToCamelCase(true);
+
+        // UUID TypeHandler 등록
+        configuration.getTypeHandlerRegistry().register(UUID.class, UUIDTypeHandler.class);
+
+        sessionFactory.setConfiguration(configuration);
+
         return sessionFactory.getObject();
     }
 
@@ -30,4 +41,4 @@ public class MyBatisConfig {
     public SqlSessionTemplate sqlSessionTemplate(SqlSessionFactory sqlSessionFactory) {
         return new SqlSessionTemplate(sqlSessionFactory);
     }
-} 
+}

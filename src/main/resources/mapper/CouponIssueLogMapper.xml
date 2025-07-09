@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.example.membership.repository.mybatis.CouponIssueLogMapper">
 
@@ -18,7 +19,7 @@
         FROM coupon_issue_log
         WHERE user_id = #{userId} AND coupon_id = #{couponId}
     </select>
-    
+
 
 
     <select id="findById" resultMap="logResultMap">
@@ -33,18 +34,31 @@
         SELECT * FROM coupon_issue_log
     </select>
 
-    <insert id="insert" parameterType="org.example.membership.entity.CouponIssueLog" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO coupon_issue_log (user_id, coupon_id, membership_level, issued_at)
-        VALUES (#{user.id}, #{coupon.id}, #{membershipLevel}, #{issuedAt})
-    </insert>
 
     <delete id="deleteById">
         DELETE FROM coupon_issue_log WHERE id = #{id}
     </delete>
 
 
+    <insert id="insert" parameterType="org.example.membership.dto.CouponIssueLogDto">
+        INSERT INTO coupon_issue_log (
+            id,
+            user_id,
+            coupon_id,
+            membership_level,
+            issued_at
+        )
+        VALUES (
+                   #{id}, #{userId}, #{couponId}, #{membershipLevel}, #{issuedAt}
+               )
+    </insert>
+
+
+
+
     <insert id="insertAll" parameterType="java.util.List">
         INSERT INTO coupon_issue_log (
+        id,
         user_id,
         coupon_id,
         membership_level,
@@ -53,13 +67,15 @@
         VALUES
         <foreach collection="list" item="log" separator=",">
             (
-            #{log.user.id},
-            #{log.coupon.id},
+            #{log.id},
+            #{log.userId},
+            #{log.couponId},
             #{log.membershipLevel},
             #{log.issuedAt}
             )
         </foreach>
     </insert>
+
 </mapper>
 
 

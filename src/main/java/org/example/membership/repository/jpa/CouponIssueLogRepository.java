@@ -7,9 +7,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.UUID;
 
 @Repository
-public interface CouponIssueLogRepository extends JpaRepository<CouponIssueLog, Long> {
+public interface CouponIssueLogRepository extends JpaRepository<CouponIssueLog, UUID> {
     List<CouponIssueLog> findByUser(User user);
     int countByUserAndCoupon(User user, Coupon coupon);
 

@@ -2,19 +2,22 @@ package org.example.membership.service.mybatis;
 
 import lombok.RequiredArgsConstructor;
 import org.apache.ibatis.session.ExecutorType;
-import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.example.membership.common.enums.MembershipLevel;
-import org.example.membership.entity.*;
-import org.example.membership.repository.mybatis.*;
+import org.example.membership.dto.CouponIssueLogDto;
+import org.example.membership.entity.Badge;
+import org.example.membership.entity.Coupon;
+import org.example.membership.entity.User;
+import org.example.membership.repository.mybatis.BadgeMapper;
+import org.example.membership.repository.mybatis.CouponIssueLogMapper;
+import org.example.membership.repository.mybatis.CouponMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.github.f4b6a3.uuid.UuidCreator;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,23 +27,21 @@ public class MyBatisCouponService {
     private final CouponIssueLogMapper couponIssueLogMapper;
     private final BadgeMapper badgeMapper;
     private final CouponMapper couponMapper;
-
     private final SqlSessionFactory sqlSessionFactory;
-
-
 
     @Transactional
     public void insertCouponLogs(User user, List<Coupon> coupons) {
         for (Coupon coupon : coupons) {
-            CouponIssueLog log = new CouponIssueLog();
-            log.setUser(user);
-            log.setCoupon(coupon);
-            log.setMembershipLevel(user.getMembershipLevel());
-            couponIssueLogMapper.insert(log);
+            CouponIssueLogDto dto = new CouponIssueLogDto();
+            dto.setId(UuidCreator.getTimeOrdered());
+            dto.setUserId(user.getId());
+            dto.setCouponId(coupon.getId());
+            dto.setMembershipLevel(user.getMembershipLevel());
+            dto.setIssuedAt(LocalDateTime.now());
+
+            couponIssueLogMapper.insert(dto);
         }
     }
-
-
 
     public void bulkIssueCoupons(List<User> users,
                                  Map<Long, List<Badge>> badgeMap,
@@ -50,8 +51,7 @@ public class MyBatisCouponService {
 
         try (SqlSession session = sqlSessionFactory.openSession(ExecutorType.BATCH, false)) {
             CouponIssueLogMapper mapper = session.getMapper(CouponIssueLogMapper.class);
-
-            List<CouponIssueLog> buffer = new ArrayList<>();
+            List<CouponIssueLogDto> buffer = new ArrayList<>();
             int totalCount = 0;
 
             for (User user : users) {
@@ -73,18 +73,19 @@ public class MyBatisCouponService {
                     long already = issuedCountMap.getOrDefault(key, 0L);
 
                     for (int i = (int) already; i < qty; i++) {
-                        CouponIssueLog log = new CouponIssueLog();
-                        log.setUser(user);
-                        log.setCoupon(coupon);
-                        log.setMembershipLevel(user.getMembershipLevel());
-                        log.setIssuedAt(LocalDateTime.now());
+                        CouponIssueLogDto dto = new CouponIssueLogDto();
+                        dto.setId(UuidCreator.getTimeOrdered());
+                        dto.setUserId(user.getId());
+                        dto.setCouponId(coupon.getId());
+                        dto.setMembershipLevel(user.getMembershipLevel());
+                        dto.setIssuedAt(LocalDateTime.now());
 
-                        buffer.add(log);
+                        buffer.add(dto);
                         totalCount++;
 
                         if (buffer.size() >= batchSize) {
-                           mapper.insertAll(buffer);      // ✅ 하나의 multi-row INSERT SQL
-                            session.flushStatements();     // ✅ JDBC batching 수행
+                            mapper.insertAll(buffer);
+                            session.flushStatements();
                             buffer.clear();
                             System.out.println("Flushed " + totalCount + " coupon logs");
                         }
@@ -93,15 +94,14 @@ public class MyBatisCouponService {
             }
 
             if (!buffer.isEmpty()) {
-               mapper.insertAll(buffer);
+                mapper.insertAll(buffer);
                 session.flushStatements();
                 System.out.println("Final flush of " + buffer.size() + " coupon logs");
             }
 
-            session.commit(); // JDBC transaction commit
+            session.commit();
         }
     }
-
 
     @Transactional
     public void bulkIssueCouponsWithResolvedData(List<User> users, int batchSize) {
@@ -121,18 +121,7 @@ public class MyBatisCouponService {
 
     @Transactional
     public void issueCouponsForUsers(List<User> users, int batchSize) {
-        List<Long> userIds = users.stream().map(User::getId).toList();
-
-        List<Badge> allBadges = badgeMapper.findByUserIds(userIds);
-        Map<Long, List<Badge>> badgeMap = allBadges.stream()
-                .collect(Collectors.groupingBy(b -> b.getUser().getId()));
-
-        Map<Long, Coupon> couponMap = couponMapper.findAll().stream()
-                .collect(Collectors.toMap(c -> c.getCategory().getId(), c -> c));
-
-        Map<String, Long> issuedCountMap = couponIssueLogMapper.countIssuedPerUserAndCoupon();
-
-        bulkIssueCoupons(users, badgeMap, couponMap, issuedCountMap, batchSize);
+        // Optional alias for external caller
+        bulkIssueCouponsWithResolvedData(users, batchSize);
     }
-
 }

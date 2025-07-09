@@ -4,20 +4,22 @@ import org.apache.ibatis.annotations.MapKey;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.example.membership.dto.CouponIssueLogDto;
 import org.example.membership.entity.CouponIssueLog;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Mapper
 public interface CouponIssueLogMapper {
-    void insert(CouponIssueLog log);
-    void insertAll(@Param("list") List<CouponIssueLog> logs); //
+    void insert(CouponIssueLogDto log);
+    void insertAll(@Param("list") List<CouponIssueLogDto> logs); //
 
-    CouponIssueLog findById(@Param("id") Long id);
+    CouponIssueLog findById(@Param("id") UUID id);
     List<CouponIssueLog> findByUserId(@Param("userId") Long userId);
     List<CouponIssueLog> findAll();
-    void deleteById(@Param("id") Long id);
+    void deleteById(@Param("id") UUID id);
     int countByUserIdAndCouponId(@Param("userId") Long userId, @Param("couponId") Long couponId);
 
     @MapKey("userCouponKey")

@@ -54,4 +54,4 @@ logging:
 mybatis:
   configuration:
     map-underscore-to-camel-case: true
-    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 로그 과다 시 주석 처리
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 로그 과다 시 주석 처리

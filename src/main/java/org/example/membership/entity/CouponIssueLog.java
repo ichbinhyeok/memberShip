@@ -7,6 +7,8 @@ import lombok.Setter;
 import org.example.membership.common.enums.MembershipLevel;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
+import com.github.f4b6a3.uuid.UuidCreator;
 
 @Entity
 @Table(name = "coupon_issue_log")
@@ -15,8 +17,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class CouponIssueLog {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -34,9 +35,13 @@ public class CouponIssueLog {
     private LocalDateTime issuedAt;
 
     @PrePersist
-    protected void onCreate() {
-        if (issuedAt == null) {
-            issuedAt = LocalDateTime.now();
+    protected void prePersist() {
+        if (this.id == null) {
+            this.id = UuidCreator.getTimeOrdered();
+        }
+        if (this.issuedAt == null) {
+            this.issuedAt = LocalDateTime.now();
         }
     }
+
 }
