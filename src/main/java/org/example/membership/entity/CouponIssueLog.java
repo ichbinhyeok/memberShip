@@ -17,6 +17,7 @@ import com.github.f4b6a3.uuid.UuidCreator;
 @NoArgsConstructor
 public class CouponIssueLog {
     @Id
+    @Column(length = 36)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)

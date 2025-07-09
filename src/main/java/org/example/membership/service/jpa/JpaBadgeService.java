@@ -75,8 +75,8 @@ public class JpaBadgeService {
                 OrderCountAndAmount stat = stats.get(badge.getCategory().getId());
 
                 boolean shouldBeActive = stat != null &&
-                        stat.getCount() >= 3 &&
-                        stat.getAmount().compareTo(new BigDecimal("100000")) >= 0;
+                        stat.getCount() >= 5 &&
+                        stat.getAmount().compareTo(new BigDecimal("400000")) >= 0;
 
                 if (badge.isActive() != shouldBeActive) {
                     if (shouldBeActive) {
@@ -85,7 +85,7 @@ public class JpaBadgeService {
                         badge.deactivate();
                     }
 
-                    //badgeRepository.save(badge); 명시적으로 알 수 있게
+                    badgeRepository.save(badge); //명시적으로 알 수 있게
                     count++;
                     flushAndClearIfNeeded(count, batchSize);
                 }

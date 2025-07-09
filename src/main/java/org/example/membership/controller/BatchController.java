@@ -250,10 +250,10 @@ public class BatchController {
             Long count = ((Number) row[1]).longValue();
             activeBadgeMap.put(userId, count);
 
-            jpaMembershipService.bulkUpdateMembershipLevelsAndLog(users, activeBadgeMap, batchSize);
-            log.info("[3] 사용자 등급 갱신 완료: {}ms", Duration.between(start, Instant.now()).toMillis());
         }
 
+            jpaMembershipService.bulkUpdateMembershipLevelsAndLog(users, activeBadgeMap, batchSize);
+            log.info("[3] 사용자 등급 갱신 완료: {}ms", Duration.between(start, Instant.now()).toMillis());
     }
     private void runCouponBatch(List<User> users, int batchSize) {
         Instant start = Instant.now();
