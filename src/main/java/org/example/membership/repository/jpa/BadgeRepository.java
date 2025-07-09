@@ -25,4 +25,6 @@ public interface BadgeRepository extends JpaRepository<Badge, Long> {
 
     List<Badge> findAllByUserInAndActiveTrue(List<User> users);
 
+    List<Badge> findAllByUserIn(List<User> users);
+
 }

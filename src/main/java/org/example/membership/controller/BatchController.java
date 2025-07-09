@@ -8,6 +8,7 @@ import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.Coupon;
 import org.example.membership.entity.User;
+import org.example.membership.repository.jpa.BadgeRepository;
 import org.example.membership.service.jpa.JpaBadgeService;
 import org.example.membership.service.jpa.JpaCouponService;
 import org.example.membership.service.jpa.JpaMembershipService;
@@ -39,6 +40,7 @@ public class BatchController {
     private final JpaBadgeService jpaBadgeService;
     private final JpaMembershipService jpaMembershipService;
     private final JpaCouponService jpaCouponService;
+    private final BadgeRepository badgeRepository;
 
     // MyBatis 서비스
     private final MyBatisOrderService myBatisOrderService;
@@ -240,15 +242,19 @@ public class BatchController {
 
     private void runUserLevelBatch(List<User> users, int batchSize) {
         Instant start = Instant.now();
-        Map<Long, Long> activeBadgeMap = users.stream()
-                .collect(Collectors.toMap(
-                        User::getId,
-                        u -> (long)jpaMembershipService.getUserStatus(u.getId()).getBadges().size()
-                ));
-        jpaMembershipService.bulkUpdateMembershipLevelsAndLog(users, activeBadgeMap, batchSize);
-        log.info("[3] 사용자 등급 갱신 완료: {}ms", Duration.between(start, Instant.now()).toMillis());
-    }
 
+        List<Object[]> counts = badgeRepository.countActiveBadgesGroupedByUserId();
+        Map<Long, Long> activeBadgeMap = new HashMap<>();
+        for (Object[] row : counts) {
+            Long userId = ((Number) row[0]).longValue();
+            Long count = ((Number) row[1]).longValue();
+            activeBadgeMap.put(userId, count);
+
+            jpaMembershipService.bulkUpdateMembershipLevelsAndLog(users, activeBadgeMap, batchSize);
+            log.info("[3] 사용자 등급 갱신 완료: {}ms", Duration.between(start, Instant.now()).toMillis());
+        }
+
+    }
     private void runCouponBatch(List<User> users, int batchSize) {
         Instant start = Instant.now();
         jpaCouponService.bulkIssueCoupons(users, batchSize);

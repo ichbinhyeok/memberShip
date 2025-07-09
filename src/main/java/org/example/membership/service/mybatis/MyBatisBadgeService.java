@@ -78,8 +78,8 @@ public void bulkUpdateBadgeStates(List<User> users,
                 OrderCountAndAmount stat = stats.get(badge.getCategory().getId());
 
                 boolean shouldBeActive = stat != null &&
-                        stat.getCount() >= 3 &&
-                        stat.getAmount().compareTo(new BigDecimal("300000")) >= 0;
+                        stat.getCount() >= 5 &&
+                        stat.getAmount().compareTo(new BigDecimal("400000")) >= 0;
 
                 if (badge.isActive() != shouldBeActive) {
                     if (shouldBeActive) {

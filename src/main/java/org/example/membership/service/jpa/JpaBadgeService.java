@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -59,14 +60,35 @@ public class JpaBadgeService {
                                       int batchSize) {
         int count = 0;
 
-        for (User user : users) {
-            Map<Long, OrderCountAndAmount> stats = statMap.get(user.getId());
-            List<Badge> modifiedBadges = updateBadgeStatesForUser(user, stats);
+        // Retrieve all badges for the given users in a single query
+        List<Badge> allBadges = badgeRepository.findAllByUserIn(users);
 
-            for (Badge badge : modifiedBadges) {
-                badgeRepository.save(badge);
-                count++;
-                flushAndClearIfNeeded(count, batchSize);
+        // Group badges by user id for quick lookup
+        Map<Long, List<Badge>> badgeMap = allBadges.stream()
+                .collect(Collectors.groupingBy(b -> b.getUser().getId()));
+
+        for (User user : users) {
+            Map<Long, OrderCountAndAmount> stats = statMap.getOrDefault(user.getId(), Collections.emptyMap());
+            List<Badge> badges = badgeMap.getOrDefault(user.getId(), Collections.emptyList());
+
+            for (Badge badge : badges) {
+                OrderCountAndAmount stat = stats.get(badge.getCategory().getId());
+
+                boolean shouldBeActive = stat != null &&
+                        stat.getCount() >= 3 &&
+                        stat.getAmount().compareTo(new BigDecimal("100000")) >= 0;
+
+                if (badge.isActive() != shouldBeActive) {
+                    if (shouldBeActive) {
+                        badge.activate();
+                    } else {
+                        badge.deactivate();
+                    }
+
+                    //badgeRepository.save(badge); 명시적으로 알 수 있게
+                    count++;
+                    flushAndClearIfNeeded(count, batchSize);
+                }
             }
         }
 
