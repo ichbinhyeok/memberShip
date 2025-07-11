@@ -2,6 +2,8 @@ package org.example.membership.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.OrderStatus;
+import org.example.membership.dto.CreateOrderWithCouponRequest;
+import org.example.membership.dto.OrderRequest;
 import org.example.membership.dto.OrderResponse;
 import org.example.membership.entity.Order;
 import org.example.membership.service.jpa.JpaOrderService;
@@ -17,9 +19,10 @@ public class OrderController {
     private final JpaOrderService jpaOrderService;
 
     @PostMapping
-    public Order createOrder(@RequestBody Order order) {
+    public Order createOrder(@RequestBody OrderRequest order) {
         return jpaOrderService.createOrder(order);
     }
+
 
     @GetMapping("/{id}")
     public Order getOrder(@PathVariable Long id) {

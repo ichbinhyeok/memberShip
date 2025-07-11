@@ -14,6 +14,8 @@ import java.util.List;
 public interface OrderMapper {
     void insert(OrderRequest order);
 
+    List<Order> findWithItemsByUserId(@Param("userId") Long userId);
+
     Order findById(@Param("id") Long id);
 
     List<Order> findByUserId(@Param("userId") Long userId);

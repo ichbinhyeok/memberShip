@@ -2,10 +2,11 @@ package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.OrderStatus;
-import org.example.membership.dto.OrderCountAndAmount;
-import org.example.membership.entity.Order;
-import org.example.membership.repository.jpa.OrderRepository;
-import org.example.membership.dto.OrderResponse;
+import org.example.membership.dto.*;
+import org.example.membership.entity.*;
+import org.example.membership.exception.ConflictException;
+import org.example.membership.exception.NotFoundException;
+import org.example.membership.repository.jpa.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,16 +17,64 @@ import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class JpaOrderService {
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final UserRepository userRepository;
+    private final ProductRepository productRepository;
+    private final CouponIssueLogRepository couponIssueLogRepository;
+    private final CouponUsageRepository couponUsageRepository;
 
     @Transactional
-    public Order createOrder(Order order) {
-        return orderRepository.save(order);
+    public Order createOrder(OrderRequest request) {
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        Order order = new Order();
+        order.setUser(user);
+        order.setStatus(OrderStatus.PAID);
+
+        BigDecimal total = BigDecimal.ZERO;
+        for (OrderItemRequest itemReq : request.getItems()) {
+            Product product = productRepository.findById(itemReq.getProductId())
+                    .orElseThrow(() -> new NotFoundException("Product not found"));
+            OrderItem item = new OrderItem();
+            item.setOrder(order);
+            item.setProduct(product);
+            item.setQuantity(itemReq.getQuantity());
+            item.setItemPrice(product.getPrice());
+            order.getItems().add(item);
+            total = total.add(product.getPrice().multiply(BigDecimal.valueOf(itemReq.getQuantity())));
+        }
+
+        order.setTotalAmount(total);
+        order = orderRepository.save(order);
+
+        // 쿠폰 적용 여부는 선택
+        if (request.getCouponIssueId() != null) {
+            UUID issueId =request.getCouponIssueId();
+            if (couponUsageRepository.existsByCouponIssueLog_Id(issueId)) {
+                throw new ConflictException("Coupon already used");
+            }
+
+            CouponIssueLog log = couponIssueLogRepository.findById(issueId)
+                    .orElseThrow(() -> new NotFoundException("Coupon issue not found"));
+
+            CouponUsage usage = new CouponUsage();
+            usage.setUser(user);
+            usage.setCoupon(log.getCoupon());
+            usage.setOrder(order);
+            usage.setCouponIssueLog(log);
+            couponUsageRepository.save(usage);
+        }
+
+        return order;
     }
+
 
     @Transactional(readOnly = true)
     public Order getOrderById(Long id) {
@@ -63,7 +112,7 @@ public class JpaOrderService {
             OrderResponse dto = new OrderResponse();
             dto.setId(order.getId());
             dto.setUserId(order.getUser().getId());
-            dto.setOrderAmount(order.getOrderAmount());
+            dto.setTotalAmount(order.getTotalAmount());
             dto.setStatus(order.getStatus());
             dto.setOrderedAt(order.getOrderedAt());
             return dto;
@@ -94,5 +143,9 @@ public class JpaOrderService {
 
         return statMap;
     }
+
+
+
+
 
 } 

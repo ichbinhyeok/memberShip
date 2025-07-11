@@ -2,11 +2,17 @@ package org.example.membership.service.mybatis;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.dto.OrderCountAndAmount;
+import org.example.membership.dto.OrderItemRequest;
 import org.example.membership.dto.UserCategoryOrderStats;
 import org.example.membership.entity.Order;
+import org.example.membership.entity.OrderItem;
+import org.example.membership.entity.Product;
+import org.example.membership.repository.mybatis.OrderItemMapper;
 import org.example.membership.repository.mybatis.OrderMapper;
 import org.example.membership.common.enums.OrderStatus;
 import org.example.membership.dto.OrderRequest;
+import org.example.membership.repository.mybatis.ProductMapper;
+import org.example.membership.repository.mybatis.UserMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,11 +28,35 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MyBatisOrderService {
     private final OrderMapper orderMapper;
+    private final OrderItemMapper orderItemMapper;
+    private final UserMapper userMapper;
+    private final ProductMapper productMapper;
 
     @Transactional
     public OrderRequest createOrder(OrderRequest order) {
         order.setOrderedAt(LocalDateTime.now());
+        java.math.BigDecimal total = java.math.BigDecimal.ZERO;
+        if (order.getItems() != null) {
+            for (OrderItemRequest itemReq : order.getItems()) {
+                Product product = productMapper.findById(itemReq.getProductId());
+                total = total.add(product.getPrice().multiply(java.math.BigDecimal.valueOf(itemReq.getQuantity())));
+            }
+        }
+        order.setTotalAmount(total);
         orderMapper.insert(order);
+        if (order.getItems() != null) {
+            for (org.example.membership.dto.OrderItemRequest itemReq : order.getItems()) {
+                OrderItem item = new OrderItem();
+                org.example.membership.entity.Order ref = new org.example.membership.entity.Order();
+                ref.setId(order.getId());
+                item.setOrder(ref);
+                org.example.membership.entity.Product product = productMapper.findById(itemReq.getProductId());
+                item.setProduct(product);
+                item.setQuantity(itemReq.getQuantity());
+                item.setItemPrice(product.getPrice());
+                orderItemMapper.insert(item);
+            }
+        }
         return order;
     }
 

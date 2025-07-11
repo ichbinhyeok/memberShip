@@ -25,6 +25,7 @@ public class JpaMembershipService {
     private final BadgeRepository badgeRepository;
     private final CouponIssueLogRepository couponIssueLogRepository;
     private final CategoryRepository categoryRepository;
+    private final MembershipLogRepository membershipLogRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -77,9 +78,10 @@ public class JpaMembershipService {
 
     @Transactional
     public void deleteUser(Long id) {
-        userRepository.deleteById(id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository.delete(user);
     }
-
     @Transactional(readOnly = true)
     public List<User> getUsersByMembershipLevel(MembershipLevel level) {
         return userRepository.findByMembershipLevel(level);
@@ -151,6 +153,32 @@ public class JpaMembershipService {
         entityManager.flush();
         entityManager.clear();
     }
+
+    @Transactional
+    public MembershipLog manualChangeLevel(Long userId, MembershipLevel newLevel) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        if (user.getMembershipLevel() == newLevel) {
+            return null;
+        }
+
+        MembershipLevel previous = user.getMembershipLevel();
+        user.setMembershipLevel(newLevel);
+        user.setLastMembershipChange(LocalDateTime.now());
+
+        MembershipLog log = new MembershipLog();
+        log.setUser(user);
+        log.setPreviousLevel(previous);
+        log.setNewLevel(newLevel);
+        log.setChangeReason("manual update");
+
+        membershipLogRepository.save(log);
+
+        return log;
+    }
+
+
 
     private void flushAndClearIfNeeded(int count, int batchSize) {
         if (count % batchSize == 0) {

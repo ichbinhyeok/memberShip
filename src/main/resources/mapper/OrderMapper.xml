@@ -5,9 +5,8 @@
     <resultMap id="orderResultMap" type="org.example.membership.dto.OrderResponse">
         <id property="id" column="id"/>
         <result property="userId" column="user_id"/>
-        <result property="productId" column="product_id"/>
         <result property="couponId" column="coupon_id"/>
-        <result property="orderAmount" column="order_amount"/>
+        <result property="totalAmount" column="total_amount"/>
         <result property="status" column="status"/>
         <result property="orderedAt" column="ordered_at"/>
     </resultMap>
@@ -20,22 +19,31 @@
         SELECT * FROM orders WHERE user_id = #{userId}
     </select>
 
+    <select id="findWithItemsByUserId" resultMap="orderResultMap">
+        SELECT o.*,
+               oi.id          AS oi_id,
+               oi.product_id  AS oi_product_id,
+               oi.quantity    AS oi_quantity,
+               oi.item_price  AS oi_item_price
+        FROM orders o
+                 LEFT JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.user_id = #{userId}
+    </select>
+
     <insert id="insert"
             parameterType="org.example.membership.dto.OrderRequest"
             useGeneratedKeys="true"
             keyProperty="id">
         INSERT INTO orders (
             user_id,
-            product_id,
             coupon_id,
-            order_amount,
+            total_amount,
             status,
             ordered_at
         ) VALUES (
                      #{userId},
-                     #{productId},
                      #{couponId},
-                     #{orderAmount},
+                     #{totalAmount},
                      #{status},
                      #{orderedAt}
                  )
@@ -51,9 +59,8 @@
 
     <update id="update" parameterType="org.example.membership.entity.Order">
         UPDATE orders
-        SET product_id = #{product.id},
-            coupon_id = #{coupon.id},
-            order_amount = #{orderAmount},
+        SET coupon_id = #{coupon.id},
+            total_amount = #{totalAmount},
             status = #{status},
             ordered_at = #{orderedAt}
         WHERE id = #{id}
@@ -65,9 +72,9 @@
 
     <select id="sumOrderAmountByUserBetween" resultType="org.example.membership.dto.UserOrderTotal">
         SELECT o.user_id AS userId,
-               SUM(o.order_amount - IFNULL(c.discount_amount,0)) AS totalAmount
+               SUM(oi.item_price * oi.quantity - IFNULL(c.discount_amount,0)) AS totalAmount
         FROM orders o
-                 JOIN products p ON o.product_id = p.id
+                 JOIN order_items oi ON oi.order_id = o.id
                  LEFT JOIN coupons c ON o.coupon_id = c.id
         WHERE o.status = 'PAID'
           AND o.ordered_at BETWEEN #{start} AND #{end}
@@ -77,13 +84,14 @@
     <select id="aggregateByUserAndCategoryBetween" resultType="org.example.membership.dto.UserCategoryOrderStats">
         SELECT o.user_id AS userId,
                p.category_id AS categoryId,
-               COUNT(o.id) AS orderCount,
-               SUM(o.order_amount - IFNULL(c.discount_amount,0)) AS totalAmount
+               COUNT(oi.id) AS orderCount,
+               SUM(oi.item_price * oi.quantity - IFNULL(c.discount_amount,0)) AS totalAmount
         FROM orders o
-                 JOIN products p ON o.product_id = p.id
+                 JOIN order_items oi ON oi.order_id = o.id
+                 JOIN products p ON oi.product_id = p.id
                  LEFT JOIN coupons c ON o.coupon_id = c.id
         WHERE o.status = 'PAID'
           AND o.ordered_at BETWEEN #{start} AND #{end}
         GROUP BY o.user_id, p.category_id
     </select>
-</mapper> 
+</mapper>

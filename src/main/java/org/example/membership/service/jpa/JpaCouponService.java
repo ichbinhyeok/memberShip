@@ -7,9 +7,11 @@ import org.example.membership.entity.Badge;
 import org.example.membership.entity.Coupon;
 import org.example.membership.entity.CouponIssueLog;
 import org.example.membership.entity.User;
+import org.example.membership.exception.NotFoundException;
 import org.example.membership.repository.jpa.BadgeRepository;
 import org.example.membership.repository.jpa.CouponIssueLogRepository;
 import org.example.membership.repository.jpa.CouponRepository;
+import org.example.membership.repository.jpa.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,7 @@ public class JpaCouponService {
     private final BadgeRepository badgeRepository;
     private final CouponRepository couponRepository;
     private final CouponIssueLogRepository couponIssueLogRepository;
+    private final UserRepository userRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -65,6 +68,24 @@ public class JpaCouponService {
 
         return issuedLogs;
     }
+
+    @Transactional
+    public CouponIssueLog manualIssueCoupon(Long userId, String couponCode) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        Coupon coupon = couponRepository.findByCode(couponCode)
+                .orElseThrow(() -> new NotFoundException("Coupon not found"));
+
+        CouponIssueLog log = new CouponIssueLog();
+        log.setUser(user);
+        log.setCoupon(coupon);
+        log.setMembershipLevel(user.getMembershipLevel());
+        log.setIssuedAt(LocalDateTime.now());
+
+        return couponIssueLogRepository.save(log);
+    }
+
 
     @Transactional
     public void bulkIssueCoupons(List<User> users, int batchSize) {
@@ -127,5 +148,10 @@ public class JpaCouponService {
     }
 
 
+    public List<CouponIssueLog> getIssuedCouponsByUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        return couponIssueLogRepository.findByUser(user);
 
+    }
 }

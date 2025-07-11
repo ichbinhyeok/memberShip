@@ -5,8 +5,12 @@ import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.Badge;
+import org.example.membership.entity.Category;
 import org.example.membership.entity.User;
+import org.example.membership.exception.NotFoundException;
 import org.example.membership.repository.jpa.BadgeRepository;
+import org.example.membership.repository.jpa.CategoryRepository;
+import org.example.membership.repository.jpa.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +25,8 @@ import java.util.stream.Collectors;
 public class JpaBadgeService {
 
     private final BadgeRepository badgeRepository;
+    private final UserRepository userRepository;
+    private final CategoryRepository categoryRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -96,6 +102,9 @@ public class JpaBadgeService {
         entityManager.clear();
     }
 
+
+
+
     private void flushAndClearIfNeeded(int count, int batchSize) {
         if (count % batchSize == 0) {
             entityManager.flush();
@@ -103,4 +112,22 @@ public class JpaBadgeService {
         }
     }
 
+    @Transactional
+    public Badge changeBadgeActivation(Long userId, Long categoryId, boolean active) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new NotFoundException("Category not found"));
+
+        Badge badge = badgeRepository.findByUserAndCategory(user, category)
+                .orElseThrow(() -> new NotFoundException("Badge not found"));
+
+        if (active) {
+            badge.activate();
+        } else {
+            badge.deactivate();
+        }
+
+        return  badge; //badgeRepository.save(badge);
+    }
 }

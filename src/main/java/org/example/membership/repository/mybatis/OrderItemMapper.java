@@ -10,22 +10,21 @@ import org.example.membership.entity.Order;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.example.membership.entity.OrderItem;
+
+import java.util.List;
+
 @Mapper
 public interface OrderItemMapper {
-    void insert(OrderRequest order);
-    Order findById(@Param("id") Long id);
+    void insert(OrderItem item);
 
-    List<Order> findByUserId(@Param("userId") Long userId);
+    OrderItem findById(@Param("id") Long id);
 
-    List<Order> findAll();
+    List<OrderItem> findByOrderId(@Param("orderId") Long orderId);
 
-    void update(@Param("order") Order order);
+    void update(@Param("item") OrderItem item);
 
     void deleteById(@Param("id") Long id);
-
-    List<UserOrderTotal> sumOrderAmountByUserBetween(@Param("start") LocalDateTime start,
-                                                     @Param("end") LocalDateTime end);
-
-    List<UserCategoryOrderStats> aggregateByUserAndCategoryBetween(@Param("start") LocalDateTime start,
-                                                                   @Param("end") LocalDateTime end);
 }

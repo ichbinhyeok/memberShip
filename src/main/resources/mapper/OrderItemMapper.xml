@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="org.example.membership.entity.OrderItemMapper">
+<mapper namespace="org.example.membership.repository.mybatis.OrderItemMapper">
     <resultMap id="orderItemResultMap" type="org.example.membership.entity.OrderItem">
         <id property="id" column="id"/>
         <result property="quantity" column="quantity"/>
+        <result property="itemPrice" column="item_price"/>
         <association property="order" javaType="org.example.membership.entity.Order">
             <id property="id" column="order_id"/>
         </association>
@@ -25,15 +26,16 @@
     </select>
 
     <insert id="insert" parameterType="org.example.membership.entity.OrderItem" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO order_items (order_id, product_id, quantity)
-        VALUES (#{order.id}, #{product.id}, #{quantity})
+        INSERT INTO order_items (order_id, product_id, quantity, item_price)
+        VALUES (#{order.id}, #{product.id}, #{quantity}, #{itemPrice})
     </insert>
 
     <update id="update" parameterType="org.example.membership.entity.OrderItem">
         UPDATE order_items SET
                                order_id = #{order.id},
                                product_id = #{product.id},
-                               quantity = #{quantity}
+                               quantity = #{quantity},
+                               item_price = #{itemPrice}
         WHERE id = #{id}
     </update>
 

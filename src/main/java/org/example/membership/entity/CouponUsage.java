@@ -33,6 +33,10 @@ public class CouponUsage {
     @Column(name = "used_at")
     private LocalDateTime usedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coupon_issue_log_id")
+    private CouponIssueLog couponIssueLog;
+
     @PrePersist
     protected void onCreate() {
         if (usedAt == null) {

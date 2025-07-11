@@ -1,6 +1,8 @@
 package org.example.membership.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.dto.BadgeActivationRequest;
+import org.example.membership.dto.ManualBadgeActivationRequest;
 import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.User;
@@ -17,9 +19,19 @@ public class BadgeController {
 
     private final JpaBadgeService jpaBadgeService;
 
+
     @PostMapping("/update")
     public List<Badge> updateBadgeStates(@RequestBody User user,
                                          @RequestBody(required = false) Map<Long, OrderCountAndAmount> statMap) {
         return jpaBadgeService.updateBadgeStatesForUser(user, statMap);
     }
+
+    @PostMapping("/activate")
+        public Badge activate(@RequestBody BadgeActivationRequest request) {
+            return jpaBadgeService.changeBadgeActivation(
+                    request.getUserId(),
+                    request.getCategoryId(),
+                    request.isActive()
+            );
+        }
 }

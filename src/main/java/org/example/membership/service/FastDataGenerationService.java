@@ -113,38 +113,68 @@ public class FastDataGenerationService {
         }
         log.info("🔄 전체 사용자 주문 생성 시작 (JDBC)");
         int total = 0;
+        long orderIdSeq = 1L; // ✅ 수동 ID 시작값
         Random rand = new Random();
+
         try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                     "INSERT INTO orders (user_id, product_id, order_amount, status, ordered_at) VALUES (?, ?, ?, ?, ?)") ) {
+             PreparedStatement orderPs = conn.prepareStatement(
+                     "INSERT INTO orders (id, user_id, total_amount, status, ordered_at) VALUES (?, ?, ?, ?, ?)");
+             PreparedStatement itemPs = conn.prepareStatement(
+                     "INSERT INTO order_items (order_id, product_id, quantity, item_price) VALUES (?, ?, ?, ?)")) {
+
             conn.setAutoCommit(false);
+
             for (Long userId : userIds) {
-                int orderCount = rand.nextInt(11) + 30; // 10~20
+                int orderCount = rand.nextInt(11) + 30; // 30~40 주문 생성
                 for (int i = 0; i < orderCount; i++, total++) {
-                    Long productId = productIds.get(rand.nextInt(productIds.size()));
-                    BigDecimal price = productPriceMap.get(productId);
-                    int qty = rand.nextInt(5) + 1;
-                    BigDecimal amount = price.multiply(BigDecimal.valueOf(qty));
-                    ps.setLong(1, userId);
-                    ps.setLong(2, productId);
-                    ps.setBigDecimal(3, amount);
-                    ps.setString(4, getRandomOrderStatus());
-                    int month = rand.nextInt(3) + 3; // 3~5월
-                    ps.setTimestamp(5, Timestamp.valueOf(generateRandomDate(2025, month)));
-                    ps.addBatch();
+                    long orderId = orderIdSeq++; // ✅ 수동 ID 생성
+                    int itemCount = rand.nextInt(3) + 1;
+                    BigDecimal totalAmount = BigDecimal.ZERO;
+                    List<Object[]> itemData = new ArrayList<>();
+
+                    for (int j = 0; j < itemCount; j++) {
+                        Long productId = productIds.get(rand.nextInt(productIds.size()));
+                        BigDecimal price = productPriceMap.get(productId);
+                        int qty = rand.nextInt(5) + 1;
+                        totalAmount = totalAmount.add(price.multiply(BigDecimal.valueOf(qty)));
+                        itemData.add(new Object[]{productId, qty, price});
+                    }
+
+                    orderPs.setLong(1, orderId); // ✅ 수동 ID 세팅
+                    orderPs.setLong(2, userId);
+                    orderPs.setBigDecimal(3, totalAmount);
+                    orderPs.setString(4, getRandomOrderStatus());
+                    int month = rand.nextInt(3) + 3;
+                    orderPs.setTimestamp(5, Timestamp.valueOf(generateRandomDate(2025, month)));
+                    orderPs.addBatch(); // ✅ batch insert 준비
+
+                    for (Object[] data : itemData) {
+                        itemPs.setLong(1, orderId); // ✅ 수동 ID로 연동
+                        itemPs.setLong(2, (Long) data[0]);
+                        itemPs.setInt(3, (Integer) data[1]);
+                        itemPs.setBigDecimal(4, (BigDecimal) data[2]);
+                        itemPs.addBatch();
+                    }
+
                     if (total % ORDER_BATCH_SIZE == 0) {
-                        ps.executeBatch();
-                        ps.clearBatch();
+                        orderPs.executeBatch();
+                        orderPs.clearBatch();
+                        itemPs.executeBatch();
+                        itemPs.clearBatch();
                         log.info("✅ 주문 진행률: {}", total);
                     }
                 }
             }
-            ps.executeBatch();
+
+            orderPs.executeBatch(); // 🔁 마지막 flush
+            itemPs.executeBatch();
             conn.commit();
             log.info("🎉 주문 생성 완료");
+
         } catch (SQLException e) {
             throw new RuntimeException("주문 배치 삽입 실패", e);
         }
+
         return total;
     }
 

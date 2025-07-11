@@ -2,11 +2,11 @@ package org.example.membership.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
-import org.example.membership.dto.CreateUserRequest;
-import org.example.membership.dto.MembershipInfoResponse;
-import org.example.membership.dto.UserStatusResponse;
+import org.example.membership.dto.*;
+import org.example.membership.entity.MembershipLog;
 import org.example.membership.entity.User;
 import org.example.membership.service.jpa.JpaMembershipService;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -53,8 +53,25 @@ public class UserController {
         return jpaMembershipService.getUsersByMembershipLevel(level);
     }
 
-    @DeleteMapping("/{id}")
-    public void deleteUser(@PathVariable Long id) {
-        jpaMembershipService.deleteUser(id);
+    @DeleteMapping("/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteUser(@PathVariable Long userId) {
+        jpaMembershipService.deleteUser(userId);
+    }
+
+
+    @PostMapping("/level/manual")
+    public MembershipLogResponse manualChange(@RequestBody ManualMembershipLevelChangeRequest request) {
+        MembershipLog log = jpaMembershipService.manualChangeLevel(request.getUserId(), request.getNewLevel());
+        if (log == null) {
+            return null;
+        }
+        MembershipLogResponse resp = new MembershipLogResponse();
+        resp.setUserId(log.getUser().getId());
+        resp.setPreviousLevel(log.getPreviousLevel());
+        resp.setNewLevel(log.getNewLevel());
+        resp.setChangeReason(log.getChangeReason());
+        resp.setChangedAt(log.getChangedAt());
+        return resp;
     }
 }
