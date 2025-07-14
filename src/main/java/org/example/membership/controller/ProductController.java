@@ -1,6 +1,7 @@
 package org.example.membership.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.dto.ProductResponse;
 import org.example.membership.entity.Product;
 import org.example.membership.service.jpa.JpaProductService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +19,10 @@ public class ProductController {
     private final JpaProductService jpaProductService;
 
     @GetMapping("/list")
-    public List<Product> list() {
-        return jpaProductService.getAllProducts();
+    public List<ProductResponse> list() {
+        return jpaProductService.getAllProducts().stream()
+                .map(ProductResponse::fromEntity)
+                .toList();
     }
+
 }

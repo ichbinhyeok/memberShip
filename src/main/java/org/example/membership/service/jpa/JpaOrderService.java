@@ -30,13 +30,14 @@ public class JpaOrderService {
     private final CouponUsageRepository couponUsageRepository;
 
     @Transactional
-    public Order createOrder(OrderRequest request) {
+    public OrderResponse createOrder(OrderCreateRequest request) {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
         Order order = new Order();
         order.setUser(user);
         order.setStatus(OrderStatus.PAID);
+        order.setOrderedAt(LocalDateTime.now());
 
         BigDecimal total = BigDecimal.ZERO;
         for (OrderItemRequest itemReq : request.getItems()) {
@@ -54,9 +55,10 @@ public class JpaOrderService {
         order.setTotalAmount(total);
         order = orderRepository.save(order);
 
-        // 쿠폰 적용 여부는 선택
+        CouponUsage usage = null;
+
         if (request.getCouponIssueId() != null) {
-            UUID issueId =request.getCouponIssueId();
+            UUID issueId = request.getCouponIssueId();
             if (couponUsageRepository.existsByCouponIssueLog_Id(issueId)) {
                 throw new ConflictException("Coupon already used");
             }
@@ -64,7 +66,7 @@ public class JpaOrderService {
             CouponIssueLog log = couponIssueLogRepository.findById(issueId)
                     .orElseThrow(() -> new NotFoundException("Coupon issue not found"));
 
-            CouponUsage usage = new CouponUsage();
+            usage = new CouponUsage();
             usage.setUser(user);
             usage.setCoupon(log.getCoupon());
             usage.setOrder(order);
@@ -72,7 +74,7 @@ public class JpaOrderService {
             couponUsageRepository.save(usage);
         }
 
-        return order;
+        return toOrderResponse(order, usage);
     }
 
 
@@ -144,6 +146,37 @@ public class JpaOrderService {
         return statMap;
     }
 
+
+
+    private OrderResponse toOrderResponse(Order order, CouponUsage usage) {
+        BigDecimal original = order.getTotalAmount();
+        BigDecimal discount = usage != null
+                ? usage.getCoupon().getDiscountAmount().getAmount()
+                : BigDecimal.ZERO;
+        BigDecimal finalAmount = original.subtract(discount);
+
+        OrderResponse response = new OrderResponse();
+        response.setId(order.getId());
+        response.setUserId(order.getUser().getId());
+        response.setStatus(order.getStatus());
+        response.setOrderedAt(order.getOrderedAt());
+        response.setOriginalAmount(original);
+        response.setDiscountAmount(discount);
+        response.setFinalAmount(finalAmount);
+
+        List<OrderItemResponse> items = order.getItems().stream()
+                .map(item -> {
+                    OrderItemResponse r = new OrderItemResponse();
+                    r.setProductId(item.getProduct().getId());
+                    r.setProductName(item.getProduct().getName());
+                    r.setItemPrice(item.getItemPrice());
+                    r.setQuantity(item.getQuantity());
+                    return r;
+                }).toList();
+
+        response.setItems(items);
+        return response;
+    }
 
 
 

@@ -4,11 +4,12 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
-public class CreateOrderWithCouponRequest {
+public class OrderCreateRequest {
     private Long userId;
     private List<OrderItemRequest> items;
-    private String couponIssueId;
+    private UUID couponIssueId; // optional
 }

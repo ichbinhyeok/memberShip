@@ -3,6 +3,7 @@ package org.example.membership.common.enums;
 import java.math.BigDecimal;
 
 public enum CouponAmount {
+    W0(new BigDecimal("0")),
     W1000(new BigDecimal("1000")),
     W5000(new BigDecimal("5000")),
     W10000(new BigDecimal("10000")),

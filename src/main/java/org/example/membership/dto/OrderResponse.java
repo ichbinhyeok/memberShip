@@ -19,4 +19,8 @@ public class OrderResponse {
     private List<OrderItemResponse> items;
     private OrderStatus status;
     private LocalDateTime orderedAt;
+
+    private BigDecimal originalAmount;   // 주문 총액 (할인 전)
+    private BigDecimal discountAmount;   // 할인 금액
+    private BigDecimal finalAmount;      // 최종 결제 금액
 }

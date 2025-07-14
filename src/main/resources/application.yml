@@ -13,6 +13,7 @@ spring:
       idle-timeout: 300000
       connection-timeout: 20000
       max-lifetime: 1200000
+#      register-mbeans : true
 
   jpa:
     hibernate:
@@ -41,15 +42,35 @@ management:
 
 logging:
   level:
-    root: INFO
-    p6spy: INFO
+    root: WARN
+
+    # ======== 사용자 비즈니스 코드 흐름 로그 ========
+    org.example.membership: INFO
+
+    # ======== Hibernate SQL 및 바인딩 로그 ========
+    org.hibernate.SQL: INFO
+    org.hibernate.type.descriptor.sql.BasicBinder: INFO
+    org.hibernate.engine.jdbc.batch.internal.BatchingBatch: INFO
+
+    # ======== Hibernate Exception Helper - 락 예외 로그 핵심 ========
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: ERROR
+
+    # ======== 트랜잭션 흐름 추적 (시작/커밋/롤백) ========
+    org.springframework.transaction: DEBUG
+    org.springframework.orm.jpa: DEBUG
+
+    # ======== MyBatis 관련 (필요 시 DEBUG로 조정 가능) ========
     org.mybatis: INFO
     org.apache.ibatis: INFO
-    org.apache.ibatis.executor.BatchExecutor: DEBUG # 핵심! 실제 배치 수행 로그 확인용
+    org.apache.ibatis.executor.BatchExecutor: INFO
     org.springframework.jdbc.core: WARN
-    org.hibernate.SQL: WARN
-    org.hibernate.type.descriptor.sql.BasicBinder: WARN
-    org.hibernate.engine.jdbc.batch.internal.BatchingBatch: WARN
+
+    # ======== P6Spy (쿼리 감시) ========
+    p6spy: WARN  # 락 관련 쿼리 분석 시 유리. 과하면 WARN으로 낮춰도 됨
+
+    # ======== 커넥션 풀(Hikari) 상태 및 경고 ========
+    com.zaxxer.hikari.HikariDataSource: INFO
+    com.zaxxer.hikari.pool.HikariPool: WARN
 
 mybatis:
   configuration:

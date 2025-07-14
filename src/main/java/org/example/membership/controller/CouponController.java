@@ -2,6 +2,7 @@ package org.example.membership.controller;
 
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.dto.CouponIssueLogDto;
 import org.example.membership.dto.ManualCouponIssueRequest;
 import org.example.membership.entity.CouponIssueLog;
 import org.example.membership.entity.User;
@@ -18,9 +19,20 @@ public class CouponController {
     private final JpaCouponService jpaCouponService;
 
     @PostMapping("/issue")
-    public CouponIssueLog issue(@RequestBody ManualCouponIssueRequest request) {
-        return jpaCouponService.manualIssueCoupon(request.getUserId(), request.getCouponCode());
+    public CouponIssueLogDto  issue(@RequestBody ManualCouponIssueRequest request) {
+        CouponIssueLog log = jpaCouponService.manualIssueCoupon(request.getUserId(), request.getCouponCode());
+
+        CouponIssueLogDto dto = new CouponIssueLogDto();
+        dto.setId(log.getId());
+        dto.setUserId(log.getUser().getId());
+        dto.setCouponId(log.getCoupon().getId());
+        dto.setMembershipLevel(log.getMembershipLevel());
+        dto.setIssuedAt(log.getIssuedAt());
+
+        return dto;
+
     }
+
 
     @GetMapping("/user/{userId}")
     public List<CouponIssueLog> getUserCoupons(@PathVariable Long userId) {

@@ -7,6 +7,7 @@ import lombok.Setter;
 @Setter
 public class OrderItemResponse {
     private Long productId;
+    private String productName;
     private int quantity;
     private java.math.BigDecimal itemPrice;
 }

@@ -2,7 +2,7 @@ package org.example.membership.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.OrderStatus;
-import org.example.membership.dto.CreateOrderWithCouponRequest;
+import org.example.membership.dto.OrderCreateRequest;
 import org.example.membership.dto.OrderRequest;
 import org.example.membership.dto.OrderResponse;
 import org.example.membership.entity.Order;
@@ -19,7 +19,7 @@ public class OrderController {
     private final JpaOrderService jpaOrderService;
 
     @PostMapping
-    public Order createOrder(@RequestBody OrderRequest order) {
+    public OrderResponse createOrder(@RequestBody OrderCreateRequest order) {
         return jpaOrderService.createOrder(order);
     }
 

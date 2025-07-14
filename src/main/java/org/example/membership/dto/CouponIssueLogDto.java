@@ -16,4 +16,6 @@ public class CouponIssueLogDto {
     private Long couponId;
     private MembershipLevel membershipLevel;
     private LocalDateTime issuedAt;
+
+
 }

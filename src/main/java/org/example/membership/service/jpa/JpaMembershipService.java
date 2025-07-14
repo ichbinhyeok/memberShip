@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
+import org.example.membership.dto.UserStatusResponse;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.Category;
 import org.example.membership.entity.MembershipLog;
@@ -88,9 +89,9 @@ public class JpaMembershipService {
     }
 
     @Transactional(readOnly = true)
-    public org.example.membership.dto.UserStatusResponse getUserStatus(Long userId) {
+    public UserStatusResponse getUserStatus(Long userId) {
         User user = getUserById(userId);
-        org.example.membership.dto.UserStatusResponse resp = new org.example.membership.dto.UserStatusResponse();
+        UserStatusResponse resp = new org.example.membership.dto.UserStatusResponse();
         resp.setUserId(user.getId());
         resp.setMembershipLevel(user.getMembershipLevel());
         List<String> badges = badgeRepository.findByUser(user).stream()
