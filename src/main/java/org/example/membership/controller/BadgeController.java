@@ -1,17 +1,16 @@
 package org.example.membership.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.common.concurrent.UserCategoryProcessingFlagManager;
 import org.example.membership.dto.BadgeActivationRequest;
 import org.example.membership.dto.BadgeUpdateRequest;
-import org.example.membership.dto.ManualBadgeActivationRequest;
-import org.example.membership.dto.OrderCountAndAmount;
+import org.example.membership.dto.ManualBadgeUpdateRequest;
 import org.example.membership.entity.Badge;
-import org.example.membership.entity.User;
 import org.example.membership.service.jpa.JpaBadgeService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -19,7 +18,7 @@ import java.util.Map;
 public class BadgeController {
 
     private final JpaBadgeService jpaBadgeService;
-
+    private final UserCategoryProcessingFlagManager flagManager;
 
     @PostMapping("/update")
     public List<Badge> updateBadgeStates(@RequestBody BadgeUpdateRequest request ){
@@ -27,11 +26,36 @@ public class BadgeController {
     }
 
     @PostMapping("/activate")
-        public Badge activate(@RequestBody BadgeActivationRequest request) {
-            return jpaBadgeService.changeBadgeActivation(
+    public ResponseEntity<String> activate(@RequestBody BadgeActivationRequest request) {
+        String key = request.getUserId() + "-" + request.getCategoryId();
+        if (!flagManager.mark(key)) {
+            return ResponseEntity.accepted()
+                    .body("현재 처리 중입니다. 잠시 후 다시 시도해주세요.");
+        }
+        try {
+            jpaBadgeService.changeBadgeActivation(
                     request.getUserId(),
                     request.getCategoryId(),
                     request.isActive()
             );
+            return ResponseEntity.ok("OK");
+        } finally {
+            flagManager.clear(key);
         }
+    }
+
+    @PatchMapping("/manual-update")
+    public ResponseEntity<String> manualUpdate(@RequestBody ManualBadgeUpdateRequest request) {
+        String key = request.getUserId() + "-" + request.getCategoryId();
+        if (!flagManager.mark(key)) {
+            return ResponseEntity.accepted()
+                    .body("현재 처리 중입니다. 잠시 후 다시 시도해주세요.");
+        }
+        try {
+            jpaBadgeService.updateBadge(request.getUserId(), request.getCategoryId());
+            return ResponseEntity.ok("OK");
+        } finally {
+            flagManager.clear(key);
+        }
+    }
 }

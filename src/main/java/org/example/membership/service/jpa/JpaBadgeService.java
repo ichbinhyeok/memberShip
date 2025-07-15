@@ -27,6 +27,7 @@ public class JpaBadgeService {
     private final BadgeRepository badgeRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
+    private final JpaOrderService jpaOrderService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -130,4 +131,35 @@ public class JpaBadgeService {
 
         return  badge; //badgeRepository.save(badge);
     }
+
+    @Transactional
+    public Badge updateBadge(Long userId, Long categoryId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new NotFoundException("Category not found"));
+
+        Badge badge = badgeRepository.findByUserAndCategory(user, category)
+                .orElseThrow(() -> new NotFoundException("Badge not found"));
+
+        Map<Long, Map<Long, OrderCountAndAmount>> statMap =
+                jpaOrderService.aggregateUserCategoryStats(java.time.LocalDate.now());
+        Map<Long, OrderCountAndAmount> userStats = statMap.getOrDefault(userId, Collections.emptyMap());
+        OrderCountAndAmount stat = userStats.get(categoryId);
+
+        boolean shouldBeActive = stat != null &&
+                stat.getCount() >= 5 &&
+                stat.getAmount().compareTo(new BigDecimal("400000")) >= 0;
+
+        if (badge.isActive() != shouldBeActive) {
+            if (shouldBeActive) {
+                badge.activate();
+            } else {
+                badge.deactivate();
+            }
+        }
+
+        return badge;
+    }
 }
+
