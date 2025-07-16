@@ -42,6 +42,7 @@ public class BatchController {
     private final JpaCouponService jpaCouponService;
     private final BadgeRepository badgeRepository;
 
+
     // MyBatis 서비스
     private final MyBatisOrderService myBatisOrderService;
     private final MyBatisBadgeService myBatisBadgeService;

@@ -42,7 +42,7 @@ management:
 
 logging:
   level:
-    root: ERROR  # 전역 기본 로그 레벨을 에러로 제한
+    root: INFO  # 전역 기본 로그 레벨을 에러로 제한
 
     # [1] 내가 작성한 서비스 코드 (log.info() 찍힌 로그)
     org.example.membership: INFO

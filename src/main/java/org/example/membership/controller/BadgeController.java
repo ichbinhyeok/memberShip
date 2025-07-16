@@ -1,7 +1,7 @@
 package org.example.membership.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.example.membership.common.concurrent.UserCategoryProcessingFlagManager;
+import org.example.membership.common.concurrent.FlagManager;
 import org.example.membership.dto.BadgeActivationRequest;
 import org.example.membership.dto.BadgeUpdateRequest;
 import org.example.membership.dto.ManualBadgeUpdateRequest;
@@ -18,20 +18,37 @@ import java.util.List;
 public class BadgeController {
 
     private final JpaBadgeService jpaBadgeService;
-    private final UserCategoryProcessingFlagManager flagManager;
+    private final FlagManager flagManager;
 
     @PostMapping("/update")
-    public List<Badge> updateBadgeStates(@RequestBody BadgeUpdateRequest request ){
-        return jpaBadgeService.updateBadgeStatesForUser(request.getUser(), request.getStatMap());
+    public ResponseEntity<List<Badge>> updateBadgeStates(@RequestBody BadgeUpdateRequest request) {
+        if (flagManager.isBadgeBatchRunning()) {
+            return ResponseEntity.accepted().build();
+        }
+
+        Long userId = request.getUser().getId();
+        if (request.getStatMap() != null) {
+            for (Long categoryId : request.getStatMap().keySet()) {
+                if (flagManager.isBadgeFlagged(userId, categoryId)) {
+                    return ResponseEntity.accepted().build();
+                }
+            }
+        }
+
+        List<Badge> result = jpaBadgeService.updateBadgeStatesForUser(request.getUser(), request.getStatMap());
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/activate")
     public ResponseEntity<String> activate(@RequestBody BadgeActivationRequest request) {
-        String key = request.getUserId() + "-" + request.getCategoryId();
-        if (!flagManager.mark(key)) {
-            return ResponseEntity.accepted()
-                    .body("현재 처리 중입니다. 잠시 후 다시 시도해주세요.");
+        if (flagManager.isBadgeBatchRunning()) {
+            return ResponseEntity.accepted().build();
         }
+        if (flagManager.isBadgeFlagged(request.getUserId(), request.getCategoryId())) {
+            return ResponseEntity.accepted().build();
+        }
+
+        flagManager.addBadgeFlag(request.getUserId(), request.getCategoryId());
         try {
             jpaBadgeService.changeBadgeActivation(
                     request.getUserId(),
@@ -40,22 +57,25 @@ public class BadgeController {
             );
             return ResponseEntity.ok("OK");
         } finally {
-            flagManager.clear(key);
+            flagManager.removeBadgeFlag(request.getUserId(), request.getCategoryId());
         }
     }
 
     @PatchMapping("/manual-update")
     public ResponseEntity<String> manualUpdate(@RequestBody ManualBadgeUpdateRequest request) {
-        String key = request.getUserId() + "-" + request.getCategoryId();
-        if (!flagManager.mark(key)) {
-            return ResponseEntity.accepted()
-                    .body("현재 처리 중입니다. 잠시 후 다시 시도해주세요.");
+        if (flagManager.isBadgeBatchRunning()) {
+            return ResponseEntity.accepted().build();
         }
+        if (flagManager.isBadgeFlagged(request.getUserId(), request.getCategoryId())) {
+            return ResponseEntity.accepted().build();
+        }
+
+        flagManager.addBadgeFlag(request.getUserId(), request.getCategoryId());
         try {
             jpaBadgeService.updateBadge(request.getUserId(), request.getCategoryId());
             return ResponseEntity.ok("OK");
         } finally {
-            flagManager.clear(key);
+            flagManager.removeBadgeFlag(request.getUserId(), request.getCategoryId());
         }
     }
 }

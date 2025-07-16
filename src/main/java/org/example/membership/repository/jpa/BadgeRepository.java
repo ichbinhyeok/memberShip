@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface BadgeRepository extends JpaRepository<Badge, Long> {
@@ -29,4 +30,5 @@ public interface BadgeRepository extends JpaRepository<Badge, Long> {
 
     java.util.Optional<Badge> findByUserAndCategory(User user, Category category);
 
+    Optional<Badge> findByUserIdAndCategoryId(Long userId, Long categoryId);
 }
