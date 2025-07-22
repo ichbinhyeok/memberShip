@@ -71,22 +71,14 @@ public class JpaBadgeService {
             Long userId = Long.parseLong(parts[0]);
             Long categoryId = Long.parseLong(parts[1]);
 
-            // 플래그 기반 충돌 방지
-            if (!flagManager.addBadgeFlag(userId, categoryId)) continue;
+            Badge badge = badgeRepository.findByUserIdAndCategoryId(userId, categoryId)
+                    .orElse(null);
+            if (badge == null) continue;
 
-            try {
-                Badge badge = badgeRepository.findByUserIdAndCategoryId(userId, categoryId)
-                        .orElse(null);
-                if (badge == null) continue;
+            if (badge.isActive()) badge.deactivate();
+            else badge.activate();
 
-                // 변경 대상이므로 현재 상태와 반대로 설정
-                if (badge.isActive()) badge.deactivate();
-                else badge.activate();
-
-                toUpdate.add(badge);
-            } finally {
-                flagManager.removeBadgeFlag(userId, categoryId);
-            }
+            toUpdate.add(badge);
         }
 
         for (int i = 0; i < toUpdate.size(); i += batchSize) {
@@ -97,8 +89,6 @@ public class JpaBadgeService {
             entityManager.clear();
         }
     }
-
-
 
     /**
      * [2] 전체 유저에 대한 배치 단위 배지 상태 병렬 갱신

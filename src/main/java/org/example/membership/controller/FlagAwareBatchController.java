@@ -61,10 +61,7 @@ public class FlagAwareBatchController {
 
             Instant t3 = Instant.now();
             List<String> keysToFlag = jpaBadgeService.detectBadgeUpdateTargets(users, statMap);
-            for (String key : keysToFlag) {
-                String[] parts = key.split(":");
-                flagManager.addBadgeFlag(Long.parseLong(parts[0]), Long.parseLong(parts[1]));
-            }
+
             long time3 = Duration.between(t3, Instant.now()).toMillis();
 
             flagManager.endGlobalBadgeBatch();
@@ -112,10 +109,7 @@ public class FlagAwareBatchController {
             statMap = jpaOrderService.aggregateUserCategoryStats(LocalDate.parse(targetDate));
 
             List<String> keysToFlag = jpaBadgeService.detectBadgeUpdateTargets(users, statMap);
-            for (String key : keysToFlag) {
-                String[] parts = key.split(":");
-                flagManager.addBadgeFlag(Long.parseLong(parts[0]), Long.parseLong(parts[1]));
-            }
+
             runParallelBadgeBatch(keysToFlag, batchSize);
         } finally {
             flagManager.endGlobalBadgeBatch();
@@ -143,8 +137,16 @@ public class FlagAwareBatchController {
 
     private void runParallelBadgeBatch(List<String> keysToUpdate, int batchSize) {
         Instant totalStart = Instant.now();
-        ExecutorService executor = Executors.newFixedThreadPool(6);
 
+        // 1. 🔐 플래그 일괄 등록
+        for (String key : keysToUpdate) {
+            String[] parts = key.split(":");
+            Long userId = Long.parseLong(parts[0]);
+            Long categoryId = Long.parseLong(parts[1]);
+            flagManager.addBadgeFlag(userId, categoryId);
+        }
+
+        ExecutorService executor = Executors.newFixedThreadPool(6);
         List<List<String>> partitions = PartitionUtils.partition(keysToUpdate, 6);
         List<Future<?>> futures = new ArrayList<>();
 
@@ -168,6 +170,14 @@ public class FlagAwareBatchController {
             throw new RuntimeException(e);
         } finally {
             executor.shutdown();
+
+            // 2. 🔓 플래그 일괄 해제
+            for (String key : keysToUpdate) {
+                String[] parts = key.split(":");
+                Long userId = Long.parseLong(parts[0]);
+                Long categoryId = Long.parseLong(parts[1]);
+                flagManager.removeBadgeFlag(userId, categoryId);
+            }
         }
 
         long total = Duration.between(totalStart, Instant.now()).toMillis();
