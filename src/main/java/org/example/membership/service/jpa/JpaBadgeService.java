@@ -64,15 +64,25 @@ public class JpaBadgeService {
 
     @Transactional
     public void bulkUpdateBadgeStates(List<String> keysToUpdate, int batchSize) {
-        List<Badge> toUpdate = new ArrayList<>();
+        if (keysToUpdate == null || keysToUpdate.isEmpty()) return;
 
+        // 1. 미리 모든 배지를 조회하여 맵으로 구성 (N+1 문제 최소화)
+        Set<Long> userIds = new HashSet<>();
         for (String key : keysToUpdate) {
             String[] parts = key.split(":");
-            Long userId = Long.parseLong(parts[0]);
-            Long categoryId = Long.parseLong(parts[1]);
+            userIds.add(Long.parseLong(parts[0]));
+        }
 
-            Badge badge = badgeRepository.findByUserIdAndCategoryId(userId, categoryId)
-                    .orElse(null);
+        List<Badge> badges = badgeRepository.findAllByUserIdIn(userIds);
+        Map<String, Badge> badgeMap = new HashMap<>();
+        for (Badge badge : badges) {
+            String mapKey = badge.getUser().getId() + ":" + badge.getCategory().getId();
+            badgeMap.put(mapKey, badge);
+        }
+
+        List<Badge> toUpdate = new ArrayList<>();
+        for (String key : keysToUpdate) {
+            Badge badge = badgeMap.get(key);
             if (badge == null) continue;
 
             if (badge.isActive()) badge.deactivate();
