@@ -11,7 +11,7 @@ import java.util.UUID;
 @Getter
 @Setter
 public class CouponIssueLogDto {
-    private UUID id;
+    private String id;
     private Long userId;
     private Long couponId;
     private MembershipLevel membershipLevel;

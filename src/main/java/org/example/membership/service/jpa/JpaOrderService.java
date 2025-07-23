@@ -58,7 +58,7 @@ public class JpaOrderService {
         CouponUsage usage = null;
 
         if (request.getCouponIssueId() != null) {
-            UUID issueId = request.getCouponIssueId();
+            String issueId = request.getCouponIssueId();
             if (couponUsageRepository.existsByCouponIssueLog_Id(issueId)) {
                 throw new ConflictException("Coupon already used");
             }

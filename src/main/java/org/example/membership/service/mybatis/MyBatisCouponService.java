@@ -5,6 +5,7 @@ import org.apache.ibatis.session.ExecutorType;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.example.membership.common.enums.MembershipLevel;
+import org.example.membership.common.util.ShardPrefixedUuidGenerator;
 import org.example.membership.dto.CouponIssueLogDto;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.Coupon;
@@ -31,9 +32,11 @@ public class MyBatisCouponService {
 
     @Transactional
     public void insertCouponLogs(User user, List<Coupon> coupons) {
+        int shardNo = Math.abs(user.getId().hashCode() % 100); // 한번만 계산
+
         for (Coupon coupon : coupons) {
             CouponIssueLogDto dto = new CouponIssueLogDto();
-            dto.setId(UuidCreator.getTimeOrdered());
+            dto.setId(ShardPrefixedUuidGenerator.generate(shardNo)); // String ID
             dto.setUserId(user.getId());
             dto.setCouponId(coupon.getId());
             dto.setMembershipLevel(user.getMembershipLevel());
@@ -74,7 +77,8 @@ public class MyBatisCouponService {
 
                     for (int i = (int) already; i < qty; i++) {
                         CouponIssueLogDto dto = new CouponIssueLogDto();
-                        dto.setId(UuidCreator.getTimeOrdered());
+                        int shardNo = Math.abs(user.getId().hashCode() % 100); // 샤드 번호 결정
+                        dto.setId(ShardPrefixedUuidGenerator.generate(shardNo)); // String 기반 ID
                         dto.setUserId(user.getId());
                         dto.setCouponId(coupon.getId());
                         dto.setMembershipLevel(user.getMembershipLevel());

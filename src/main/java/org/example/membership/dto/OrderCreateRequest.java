@@ -11,5 +11,5 @@ import java.util.UUID;
 public class OrderCreateRequest {
     private Long userId;
     private List<OrderItemRequest> items;
-    private UUID couponIssueId; // optional
+    private String couponIssueId; // optional
 }
