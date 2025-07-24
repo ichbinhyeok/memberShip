@@ -26,7 +26,18 @@ public class WasInstance {
 
     private LocalDateTime registeredAt = LocalDateTime.now();
 
+    @Column(name = "last_heartbeat_at")
+    private LocalDateTime lastHeartbeatAt;
+
     public enum Status {
         RUNNING, TERMINATED
+    }
+
+    public void updateHeartbeat() {
+        this.lastHeartbeatAt = LocalDateTime.now();
+    }
+
+    public boolean isAlive(LocalDateTime threshold) {
+        return this.lastHeartbeatAt != null && this.lastHeartbeatAt.isAfter(threshold);
     }
 }

@@ -41,6 +41,11 @@ public class FlagManager {
         badgeFlags.remove(key(userId, categoryId));
     }
 
+    public void clearAllFlags() {
+        globalBadgeBatchFlag.set(false);
+        badgeFlags.clear();
+    }
+
     private String key(Long userId, Long categoryId) {
         return userId + ":" + categoryId;
     }
