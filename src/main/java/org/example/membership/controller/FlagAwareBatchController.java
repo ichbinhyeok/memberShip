@@ -20,19 +20,5 @@ public class FlagAwareBatchController {
         orchestrator.runFullBatch(targetDate, batchSize);
     }
 
-    @PostMapping("/badges")
-    public void runBadge(@RequestParam String targetDate,
-                         @RequestParam(defaultValue = "100") int batchSize) {
-        orchestrator.runBadge(targetDate, batchSize);
-    }
 
-    @PostMapping("/users")
-    public void runUserLevel(@RequestParam(defaultValue = "100") int batchSize) {
-        orchestrator.runUserLevel(batchSize);
-    }
-
-    @PostMapping("/coupons")
-    public void runCoupon(@RequestParam(defaultValue = "100") int batchSize) {
-        orchestrator.runCoupon(batchSize);
-    }
 }
