@@ -54,133 +54,137 @@ public class FlagAwareBatchOrchestrator {
         int index = self.getIndex();
         int total = (int) getAliveWasCount();
 
-        runFullBatch(targetDate, batchSize, total, index, 0);
-    }
+        LocalDate date = LocalDate.parse(targetDate);
 
-    public void runFullBatch(String targetDate, int batchSize, int total, int index, int retryCount) {
-        if (retryCount > MAX_RETRIES) {
-            log.error("[배치 중단] 최대 재시도 초과. 반복 방지를 위해 종료합니다.");
-            return;
-        }
+        // 통계는 한 번만 계산
+        Instant t1 = Instant.now();
+        Map<Long, Map<Long, OrderCountAndAmount>> statMap = jpaOrderService.aggregateUserCategoryStats(date);
+        long time1 = Duration.between(t1, Instant.now()).toMillis();
+        log.info(" ├─ [1] 통계 집계 완료: {}ms", time1);
 
-        if (retryCount > 0) {
-            flagManager.clearAllFlags();
-            log.info("[재시작 초기화] 캐시 및 플래그 상태 초기화 완료 (retry={})", retryCount);
-        }
-
-        if (flagManager.isBadgeBatchRunning()) {
-            log.warn("[전체 배치 중복 실행 차단] 이미 전역 배지 배치가 진행 중입니다.");
-            return;
-        }
-
-        flagManager.startGlobalBadgeBatch();
-        log.info("[배치 시작] targetDate={}, totalWAS={}, index={}, batchSize={}, retry={}", targetDate, total, index, batchSize, retryCount);
-
-        Instant allStart = Instant.now();
-        long time1 = 0, time2 = 0, time3 = 0;
-        long badgeTime = 0, levelTime = 0, couponTime = 0;
-
-        List<User> users = null;
-        Map<Long, Map<Long, OrderCountAndAmount>> statMap = null;
-        List<String> keysToFlag = null;
-
-        try {
-            LocalDate date = LocalDate.parse(targetDate);
-
-            StepExecutionLog stepLog = stepLogRepository
-                    .findByTargetDateAndWasIndex(date, index)
-                    .orElseGet(() -> {
-                        log.info("[StepLog 생성] targetDate={}, index={}", date, index);
-                        StepExecutionLog log = new StepExecutionLog();
-                        log.setTargetDate(date);
-                        log.setWasIndex(index);
-                        return stepLogRepository.save(log);
-                    });
-
-            Instant t1 = Instant.now();
-            statMap = jpaOrderService.aggregateUserCategoryStats(date);
-            time1 = Duration.between(t1, Instant.now()).toMillis();
-            log.info(" ├─ [1] 통계 집계 완료: {}ms", time1);
-
-            Instant t2 = Instant.now();
-            users = jpaMembershipService.getAllUsers();
-            time2 = Duration.between(t2, Instant.now()).toMillis();
-            log.info(" ├─ [2] 유저 조회 완료: {}명 ({}ms)", users.size(), time2);
-
-            int beforeFilter = users.size();
-            ShardUtil shardUtil = new ShardUtil(total, index);
-            users = users.stream().filter(user -> shardUtil.isMine(user.getId())).toList();
-            log.info(" ├─ [3] 분기 필터링 완료: {} → {}명 (index={})", beforeFilter, users.size(), index);
-
-            Instant t3 = Instant.now();
-            keysToFlag = jpaBadgeService.detectBadgeUpdateTargets(users, statMap);
-            time3 = Duration.between(t3, Instant.now()).toMillis();
-            log.info(" ├─ [4] 배지 대상 추출 완료: {}건 ({}ms)", keysToFlag.size(), time3);
-
-            if (!stepLog.isBadgeDone()) {
-                log.info("[Step5] 배지 갱신 시작");
-                Instant b1 = Instant.now();
-                badgeBatchExecutor.execute(keysToFlag, batchSize);
-                badgeTime = Duration.between(b1, Instant.now()).toMillis();
-                log.info("[Step5] 배지 갱신 완료 ({}ms)", badgeTime);
-                stepLog.setBadgeDone(true);
-                stepLogRepository.save(stepLog);
-            } else {
-                log.info("[Step5] 배지 갱신 스킵: 이미 완료됨");
+        // retry-safe 루프 구조로 변경
+        for (int retryCount = 0; retryCount <= MAX_RETRIES; retryCount++) {
+            if (retryCount > 0) {
+                flagManager.clearAllFlags();
+                log.info("[재시작 초기화] 플래그 초기화 완료 (retry={})", retryCount);
             }
 
-            if (getAliveWasCount() != total) {
-                log.warn("[스케일아웃 감지] 기존 WAS 수={} → 현재 WAS 수={}. 배치 재시작", total, getAliveWasCount());
-                runFullBatch(targetDate, batchSize, (int) getAliveWasCount(), index, retryCount + 1);
+            if (flagManager.isBadgeBatchRunning()) {
+                log.warn("[중복 실행 차단] 전역 배지 배치 중단됨");
                 return;
             }
 
-            if (!stepLog.isLevelDone()) {
-                log.info("[Step6] 등급 갱신 시작");
-                Instant l1 = Instant.now();
-                userLevelBatchExecutor.execute(users, batchSize);
-                levelTime = Duration.between(l1, Instant.now()).toMillis();
-                log.info("[Step6] 등급 갱신 완료 ({}ms)", levelTime);
-                stepLog.setLevelDone(true);
-                stepLogRepository.save(stepLog);
-            } else {
-                log.info("[Step6] 등급 갱신 스킵: 이미 완료됨");
-            }
+            flagManager.startGlobalBadgeBatch();
+            log.info("[배치 시작] targetDate={}, totalWAS={}, index={}, retry={}", targetDate, total, index, retryCount);
 
-            if (getAliveWasCount() != total) {
-                log.warn("[스케일아웃 감지] 기존 WAS 수={} → 현재 WAS 수={}. 배치 재시작", total, getAliveWasCount());
-                runFullBatch(targetDate, batchSize, (int) getAliveWasCount(), index, retryCount + 1);
-                return;
-            }
+            try {
+                Instant allStart = Instant.now();
+                long time2 = 0, time3 = 0, badgeTime = 0, levelTime = 0, couponTime = 0;
 
-            if (!stepLog.isCouponDone()) {
-                log.info("[Step7] 쿠폰 발급 시작");
-                Instant c1 = Instant.now();
-                couponBatchExecutor.execute(users, batchSize);
-                couponTime = Duration.between(c1, Instant.now()).toMillis();
-                log.info("[Step7] 쿠폰 발급 완료 ({}ms)", couponTime);
-                stepLog.setCouponDone(true);
-                stepLogRepository.save(stepLog);
-            } else {
-                log.info("[Step7] 쿠폰 발급 스킵: 이미 완료됨");
-            }
+                // StepLog 확인
+                StepExecutionLog stepLog = stepLogRepository
+                        .findByTargetDateAndWasIndex(date, index)
+                        .orElseGet(() -> {
+                            StepExecutionLog log = new StepExecutionLog();
+                            log.setTargetDate(date);
+                            log.setWasIndex(index);
+                            return stepLogRepository.save(log);
+                        });
 
-        } catch (Exception e) {
-            flagManager.endGlobalBadgeBatch();
-            log.error("[배치 실패] 예외 발생: {}", e.getMessage(), e);
-            throw new RuntimeException(e);
+                // 전체 유저 조회 후 분기 필터링
+                Instant t2 = Instant.now();
+                List<User> users = jpaMembershipService.getAllUsers();
+                long fullSize = users.size();
+
+                final ShardUtil shardUtil = new ShardUtil(total, index);
+
+                users = users.stream()
+                        .filter(user -> shardUtil.isMine(user.getId()))
+                        .toList();
+
+                time2 = Duration.between(t2, Instant.now()).toMillis();
+                log.info(" ├─ [2] 유저 필터링 완료: 전체={} → 분기={}(index={}) ({}ms)", fullSize, users.size(), index, time2);
+
+                // 배지 대상 추출
+                Instant t3 = Instant.now();
+                List<String> keysToFlag = jpaBadgeService.detectBadgeUpdateTargets(users, statMap);
+                time3 = Duration.between(t3, Instant.now()).toMillis();
+                log.info(" ├─ [3] 배지 대상 추출 완료: {}건 ({}ms)", keysToFlag.size(), time3);
+
+                // Step 1. 배지 갱신
+                if (!stepLog.isBadgeDone()) {
+                    log.info("[Step4] 배지 갱신 시작");
+                    Instant b1 = Instant.now();
+                    badgeBatchExecutor.execute(keysToFlag, batchSize);
+                    badgeTime = Duration.between(b1, Instant.now()).toMillis();
+                    log.info("[Step4] 배지 갱신 완료 ({}ms)", badgeTime);
+                    stepLog.setBadgeDone(true);
+                    stepLogRepository.save(stepLog);
+                } else {
+                    log.info("[Step4] 배지 갱신 스킵");
+                }
+
+                // 스케일아웃 감지
+                long currentAlive = getAliveWasCount();
+                if (currentAlive != total) {
+                    log.warn("[스케일아웃 감지] 기존 total={} → 현재={}. 재시작", total, currentAlive);
+                    total = (int) currentAlive;
+                    continue; // retry 루프 재진입
+                }
+
+                // Step 2. 등급 갱신
+                if (!stepLog.isLevelDone()) {
+                    log.info("[Step5] 등급 갱신 시작");
+                    Instant l1 = Instant.now();
+                    userLevelBatchExecutor.execute(users, batchSize);
+                    levelTime = Duration.between(l1, Instant.now()).toMillis();
+                    log.info("[Step5] 등급 갱신 완료 ({}ms)", levelTime);
+                    stepLog.setLevelDone(true);
+                    stepLogRepository.save(stepLog);
+                } else {
+                    log.info("[Step5] 등급 갱신 스킵");
+                }
+
+                // 스케일아웃 재검사
+                currentAlive = getAliveWasCount();
+                if (currentAlive != total) {
+                    log.warn("[스케일아웃 감지] 기존 total={} → 현재={}. 재시작", total, currentAlive);
+                    total = (int) currentAlive;
+                    continue;
+                }
+
+                // Step 3. 쿠폰 발급
+                if (!stepLog.isCouponDone()) {
+                    log.info("[Step6] 쿠폰 발급 시작");
+                    Instant c1 = Instant.now();
+                    couponBatchExecutor.execute(users, batchSize);
+                    couponTime = Duration.between(c1, Instant.now()).toMillis();
+                    log.info("[Step6] 쿠폰 발급 완료 ({}ms)", couponTime);
+                    stepLog.setCouponDone(true);
+                    stepLogRepository.save(stepLog);
+                } else {
+                    log.info("[Step6] 쿠폰 발급 스킵");
+                }
+
+                flagManager.endGlobalBadgeBatch();
+
+                long totalTime = Duration.between(allStart, Instant.now()).toMillis();
+                log.info("[배치 완료] 전체 시간: {}ms", totalTime);
+                log.info(" ├─ 유저 필터링: {}ms", time2);
+                log.info(" ├─ 배지 대상 추출: {}ms", time3);
+                log.info(" ├─ 배지 갱신: {}ms", badgeTime);
+                log.info(" ├─ 등급 갱신: {}ms", levelTime);
+                log.info(" └─ 쿠폰 발급: {}ms", couponTime);
+                return; // 성공 시 루프 종료
+
+            } catch (Exception e) {
+                flagManager.endGlobalBadgeBatch();
+                log.error("[배치 실패] 예외 발생", e);
+                throw new RuntimeException(e);
+            }
         }
 
-        flagManager.endGlobalBadgeBatch();
-
-        long totalTime = Duration.between(allStart, Instant.now()).toMillis();
-        log.info("[전체 배치 완료] 총 소요 시간: {}ms", totalTime);
-        log.info(" ├─ [1] 통계 집계: {}ms", time1);
-        log.info(" ├─ [2] 유저 조회: {}ms", time2);
-        log.info(" ├─ [3] 배지 대상 추출: {}ms", time3);
-        log.info(" ├─ [4] 배지 갱신: {}ms", badgeTime);
-        log.info(" ├─ [5] 등급 갱신: {}ms", levelTime);
-        log.info(" └─ [6] 쿠폰 발급: {}ms", couponTime);
+        log.error("[배치 중단] 최대 {}회 재시도 실패", MAX_RETRIES);
     }
 
     private long getAliveWasCount() {
