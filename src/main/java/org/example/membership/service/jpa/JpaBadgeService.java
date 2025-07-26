@@ -72,53 +72,56 @@ public class JpaBadgeService {
 
     @Transactional
     public void bulkUpdateBadgeStates(List<String> keysToUpdate, int batchSize) {
-
-        // [WAS Sharding Logic]
-        if (keysToUpdate != null) {
-            keysToUpdate = keysToUpdate.stream()
-                    .filter(k -> {
-                        String[] p = k.split(":");
-                        Long uid = Long.parseLong(p[0]);
-                        return myWasInstanceHolder.isMyUser(uid);
-                    })
-                    .toList();
+        if (keysToUpdate == null || keysToUpdate.isEmpty()) {
+            log.info("[DEBUG] bulkUpdateBadgeStates - keysToUpdate가 비어있음.");
+            return;
         }
 
-        if (keysToUpdate == null || keysToUpdate.isEmpty()) return;
+        log.info("[DEBUG] bulkUpdateBadgeStates 시작 - keysToUpdate.size={}", keysToUpdate.size());
+        log.info("[DEBUG] WAS 분기 정보 - index={}, total={}",
+                myWasInstanceHolder.getMyIndex(), myWasInstanceHolder.getTotalWas());
 
-        // 1. 미리 모든 배지를 조회하여 맵으로 구성 (N+1 문제 최소화)
+        // 분기 필터링
+        List<String> originalKeys = keysToUpdate;
+        keysToUpdate = keysToUpdate.stream().filter(k -> {
+            Long uid = Long.parseLong(k.split(":")[0]);
+            boolean isMine = myWasInstanceHolder.isMyUser(uid);
+            if (!isMine) log.debug("[DEBUG] 필터링됨 - userId={}", uid);
+            return isMine;
+        }).toList();
+
+        log.info("[DEBUG] 분기 필터링 후 size={} (원래 size={})", keysToUpdate.size(), originalKeys.size());
+        if (keysToUpdate.isEmpty()) return;
+
+        // Badge 업데이트
         Set<Long> userIds = new HashSet<>();
-        for (String key : keysToUpdate) {
-            String[] parts = key.split(":");
-            userIds.add(Long.parseLong(parts[0]));
-        }
-
+        for (String key : keysToUpdate) userIds.add(Long.parseLong(key.split(":")[0]));
         List<Badge> badges = badgeRepository.findAllByUserIdIn(userIds);
+
         Map<String, Badge> badgeMap = new HashMap<>();
         for (Badge badge : badges) {
-            String mapKey = badge.getUser().getId() + ":" + badge.getCategory().getId();
-            badgeMap.put(mapKey, badge);
+            badgeMap.put(badge.getUser().getId() + ":" + badge.getCategory().getId(), badge);
         }
 
         List<Badge> toUpdate = new ArrayList<>();
         for (String key : keysToUpdate) {
             Badge badge = badgeMap.get(key);
             if (badge == null) continue;
-
-            if (badge.isActive()) badge.deactivate();
-            else badge.activate();
-
+            badge.setActive(!badge.isActive());
             toUpdate.add(badge);
         }
+        log.info("[DEBUG] toUpdate size={}", toUpdate.size());
 
         for (int i = 0; i < toUpdate.size(); i += batchSize) {
             int end = Math.min(i + batchSize, toUpdate.size());
             List<Badge> chunk = toUpdate.subList(i, end);
+            log.debug("[DEBUG] saveAll chunk={}~{}", i, end);
             badgeRepository.saveAll(chunk);
             entityManager.flush();
             entityManager.clear();
         }
     }
+
 
     /**
      * [2] 전체 유저에 대한 배치 단위 배지 상태 병렬 갱신

@@ -47,22 +47,23 @@ public class FlagAwareBatchOrchestrator {
 
     public void runFullBatch(String targetDate, int batchSize) {
         UUID myUuid = myWasInstanceHolder.getMyUuid();
+        log.info("[DEBUG] runFullBatch 시작 - targetDate={}, batchSize={}, myUuid={}", targetDate, batchSize, myUuid);
 
         WasInstance self = wasInstanceRepository.findById(myUuid)
                 .orElseThrow(() -> new IllegalStateException("WAS 인스턴스 정보 없음"));
 
         int index = self.getIndex();
         int total = (int) getAliveWasCount();
+        log.info("[DEBUG] WAS 인덱스 정보: index={}, totalWAS={}", index, total);
 
         LocalDate date = LocalDate.parse(targetDate);
 
-        // 통계는 한 번만 계산
+        // 통계 집계
         Instant t1 = Instant.now();
         Map<Long, Map<Long, OrderCountAndAmount>> statMap = jpaOrderService.aggregateUserCategoryStats(date);
         long time1 = Duration.between(t1, Instant.now()).toMillis();
         log.info(" ├─ [1] 통계 집계 완료: {}ms", time1);
 
-        // retry-safe 루프 구조로 변경
         for (int retryCount = 0; retryCount <= MAX_RETRIES; retryCount++) {
             if (retryCount > 0) {
                 flagManager.clearAllFlags();
@@ -79,9 +80,8 @@ public class FlagAwareBatchOrchestrator {
 
             try {
                 Instant allStart = Instant.now();
-                long time2 = 0, time3 = 0, badgeTime = 0, levelTime = 0, couponTime = 0;
+                long time2, time3, badgeTime = 0, levelTime = 0, couponTime = 0;
 
-                // StepLog 확인
                 StepExecutionLog stepLog = stepLogRepository
                         .findByTargetDateAndWasIndex(date, index)
                         .orElseGet(() -> {
@@ -91,16 +91,15 @@ public class FlagAwareBatchOrchestrator {
                             return stepLogRepository.save(log);
                         });
 
-                // 전체 유저 조회 후 분기 필터링
+                // 유저 조회
                 Instant t2 = Instant.now();
                 List<User> users = jpaMembershipService.getAllUsers();
                 long fullSize = users.size();
+                log.info("[DEBUG] 전체 유저 수: {}", fullSize);
 
                 final ShardUtil shardUtil = new ShardUtil(total, index);
-
-                users = users.stream()
-                        .filter(user -> shardUtil.isMine(user.getId()))
-                        .toList();
+                users = users.stream().filter(user -> shardUtil.isMine(user.getId())).toList();
+                log.info("[DEBUG] 분기 유저 수 (index={}): {}", index, users.size());
 
                 time2 = Duration.between(t2, Instant.now()).toMillis();
                 log.info(" ├─ [2] 유저 필터링 완료: 전체={} → 분기={}(index={}) ({}ms)", fullSize, users.size(), index, time2);
@@ -111,71 +110,35 @@ public class FlagAwareBatchOrchestrator {
                 time3 = Duration.between(t3, Instant.now()).toMillis();
                 log.info(" ├─ [3] 배지 대상 추출 완료: {}건 ({}ms)", keysToFlag.size(), time3);
 
-                // Step 1. 배지 갱신
                 if (!stepLog.isBadgeDone()) {
                     log.info("[Step4] 배지 갱신 시작");
-                    Instant b1 = Instant.now();
                     badgeBatchExecutor.execute(keysToFlag, batchSize);
-                    badgeTime = Duration.between(b1, Instant.now()).toMillis();
-                    log.info("[Step4] 배지 갱신 완료 ({}ms)", badgeTime);
-                    stepLog.setBadgeDone(true);
-                    stepLogRepository.save(stepLog);
                 } else {
                     log.info("[Step4] 배지 갱신 스킵");
                 }
 
-                // 스케일아웃 감지
-                long currentAlive = getAliveWasCount();
-                if (currentAlive != total) {
-                    log.warn("[스케일아웃 감지] 기존 total={} → 현재={}. 재시작", total, currentAlive);
-                    total = (int) currentAlive;
-                    continue; // retry 루프 재진입
-                }
+                currentAliveCheck(total);
 
-                // Step 2. 등급 갱신
                 if (!stepLog.isLevelDone()) {
                     log.info("[Step5] 등급 갱신 시작");
-                    Instant l1 = Instant.now();
                     userLevelBatchExecutor.execute(users, batchSize);
-                    levelTime = Duration.between(l1, Instant.now()).toMillis();
-                    log.info("[Step5] 등급 갱신 완료 ({}ms)", levelTime);
-                    stepLog.setLevelDone(true);
-                    stepLogRepository.save(stepLog);
                 } else {
                     log.info("[Step5] 등급 갱신 스킵");
                 }
 
-                // 스케일아웃 재검사
-                currentAlive = getAliveWasCount();
-                if (currentAlive != total) {
-                    log.warn("[스케일아웃 감지] 기존 total={} → 현재={}. 재시작", total, currentAlive);
-                    total = (int) currentAlive;
-                    continue;
-                }
+                currentAliveCheck(total);
 
-                // Step 3. 쿠폰 발급
                 if (!stepLog.isCouponDone()) {
                     log.info("[Step6] 쿠폰 발급 시작");
-                    Instant c1 = Instant.now();
                     couponBatchExecutor.execute(users, batchSize);
-                    couponTime = Duration.between(c1, Instant.now()).toMillis();
-                    log.info("[Step6] 쿠폰 발급 완료 ({}ms)", couponTime);
-                    stepLog.setCouponDone(true);
-                    stepLogRepository.save(stepLog);
                 } else {
                     log.info("[Step6] 쿠폰 발급 스킵");
                 }
 
                 flagManager.endGlobalBadgeBatch();
-
                 long totalTime = Duration.between(allStart, Instant.now()).toMillis();
                 log.info("[배치 완료] 전체 시간: {}ms", totalTime);
-                log.info(" ├─ 유저 필터링: {}ms", time2);
-                log.info(" ├─ 배지 대상 추출: {}ms", time3);
-                log.info(" ├─ 배지 갱신: {}ms", badgeTime);
-                log.info(" ├─ 등급 갱신: {}ms", levelTime);
-                log.info(" └─ 쿠폰 발급: {}ms", couponTime);
-                return; // 성공 시 루프 종료
+                return;
 
             } catch (Exception e) {
                 flagManager.endGlobalBadgeBatch();
@@ -185,6 +148,14 @@ public class FlagAwareBatchOrchestrator {
         }
 
         log.error("[배치 중단] 최대 {}회 재시도 실패", MAX_RETRIES);
+    }
+
+    private void currentAliveCheck(long total) {
+        long currentAlive = getAliveWasCount();
+        if (currentAlive != total) {
+            log.warn("[스케일아웃 감지] 기존 total={} → 현재={}. 재시작", total, currentAlive);
+            throw new IllegalStateException("WAS 수 변경 감지");
+        }
     }
 
     private long getAliveWasCount() {

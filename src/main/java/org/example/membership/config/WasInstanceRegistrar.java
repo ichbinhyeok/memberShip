@@ -10,7 +10,6 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
-
 @Component
 @RequiredArgsConstructor
 public class WasInstanceRegistrar implements ApplicationRunner {
@@ -29,6 +28,7 @@ public class WasInstanceRegistrar implements ApplicationRunner {
         instance.setIndex(index);
         wasInstanceRepository.save(instance);
 
-        myWasInstanceHolder.setMyUuid(uuid); // 여기에 저장
+        myWasInstanceHolder.setMyUuid(uuid);
+        myWasInstanceHolder.setMyIndex(index);
     }
 }

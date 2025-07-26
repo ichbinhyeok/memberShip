@@ -1,18 +1,70 @@
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 300        # 톰캣 최대 스레드 수 (부하 테스트 대비 증가)
+      min-spare: 20
+    accept-count: 200 # 대기열 큐 사이즈
+
 spring:
   datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://host.docker.internal:3308/membership?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
     password: 1234
+    hikari:
+      maximum-pool-size: 50       # DB 커넥션 풀 사이즈
+      minimum-idle: 5
+      idle-timeout: 300000        # 5분
+      connection-timeout: 20000   # 20초
+      max-lifetime: 1200000       # 20분
+      register-mbeans: true       # 모니터링용
+
   jpa:
     hibernate:
       ddl-auto: update
+    show-sql: false               # SQL 출력 OFF
     properties:
       hibernate:
+        jdbc:
+          batch_size: 1000        # 배치 Insert 최적화
+        format_sql: true
         dialect: org.hibernate.dialect.MySQL8Dialect
+        order_inserts: true
+        order_updates: true
+
   batch:
     job:
       enabled: false
+    jdbc:
+      initialize-schema: always
 
 logging:
   level:
-    org.example: INFO
+    root: WARN
+    org.example.membership: DEBUG  # 여기서 DEBUG로 바꾸면 log.debug도 출력됨
+    org.springframework.transaction: ERROR
+    org.hibernate.SQL: OFF
+    org.hibernate.type.descriptor.sql.BasicBinder: OFF
+    com.zaxxer.hikari: WARN
+
+
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui/index.html  # swagger-ui.html 대신 index.html로 지정
+    url: /v3/api-docs
+    operationsSorter: method
+    disable-swagger-default-url: true
+    display-request-duration: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+was:
+  index: 0  # 멀티 WAS 시 환경별 인덱스 값 (0,1,2...)
