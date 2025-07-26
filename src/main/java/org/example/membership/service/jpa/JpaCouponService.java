@@ -3,6 +3,7 @@ package org.example.membership.service.jpa;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
+import org.example.membership.config.MyWasInstanceHolder;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.Coupon;
 import org.example.membership.entity.CouponIssueLog;
@@ -30,11 +31,18 @@ public class JpaCouponService {
     private final CouponIssueLogRepository couponIssueLogRepository;
     private final UserRepository userRepository;
 
+    private final MyWasInstanceHolder myWasInstanceHolder;
+
     @PersistenceContext
     private EntityManager entityManager;
 
     @Transactional
     public List<CouponIssueLog> issueCoupons(User user) {
+        // [WAS Sharding Logic]
+        if (!myWasInstanceHolder.isMyUser(user.getId())) {
+            return new ArrayList<>();
+        }
+
         int qty = switch (user.getMembershipLevel()) {
             case VIP -> 3;
             case GOLD -> 2;
@@ -71,6 +79,10 @@ public class JpaCouponService {
 
     @Transactional
     public CouponIssueLog manualIssueCoupon(Long userId, String couponCode) {
+        // [WAS Sharding Logic]
+        if (!myWasInstanceHolder.isMyUser(userId)) {
+            return null;
+        }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
@@ -89,6 +101,12 @@ public class JpaCouponService {
 
     @Transactional
     public void bulkIssueCoupons(List<User> users, int batchSize) {
+
+        // [WAS Sharding Logic]
+        users = users.stream()
+                .filter(u -> myWasInstanceHolder.isMyUser(u.getId()))
+                .toList();
+
         // 1. 사용자별 배지 사전 조회
         Map<Long, List<Badge>> badgeMap = badgeRepository.findAllByUserInAndActiveTrue(users).stream()
                 .collect(Collectors.groupingBy(b -> b.getUser().getId()));
@@ -149,6 +167,12 @@ public class JpaCouponService {
 
 
     public List<CouponIssueLog> getIssuedCouponsByUser(Long userId) {
+
+        // [WAS Sharding Logic]
+        if (!myWasInstanceHolder.isMyUser(userId)) {
+            return List.of();
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
         return couponIssueLogRepository.findByUser(user);

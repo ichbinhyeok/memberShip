@@ -5,6 +5,7 @@ import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.membership.common.concurrent.FlagManager;
+import org.example.membership.config.MyWasInstanceHolder;
 import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.Category;
@@ -32,6 +33,8 @@ public class JpaBadgeService {
     private final JpaOrderService jpaOrderService;
     private final FlagManager flagManager;
 
+    private final MyWasInstanceHolder myWasInstanceHolder;
+
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -40,6 +43,11 @@ public class JpaBadgeService {
      */
     @Transactional
     public List<Badge> updateBadgeStatesForUser(User user, Map<Long, OrderCountAndAmount> statsByCategory) {
+        // [WAS Sharding Logic]
+        if (!myWasInstanceHolder.isMyUser(user.getId())) {
+            return Collections.emptyList();
+        }
+
         if (statsByCategory == null) statsByCategory = Collections.emptyMap();
 
         List<Badge> modifiedBadges = new ArrayList<>();
@@ -64,6 +72,18 @@ public class JpaBadgeService {
 
     @Transactional
     public void bulkUpdateBadgeStates(List<String> keysToUpdate, int batchSize) {
+
+        // [WAS Sharding Logic]
+        if (keysToUpdate != null) {
+            keysToUpdate = keysToUpdate.stream()
+                    .filter(k -> {
+                        String[] p = k.split(":");
+                        Long uid = Long.parseLong(p[0]);
+                        return myWasInstanceHolder.isMyUser(uid);
+                    })
+                    .toList();
+        }
+
         if (keysToUpdate == null || keysToUpdate.isEmpty()) return;
 
         // 1. 미리 모든 배지를 조회하여 맵으로 구성 (N+1 문제 최소화)
@@ -107,6 +127,11 @@ public class JpaBadgeService {
     public void bulkUpdateBadgeStates(List<User> users,
                                       Map<Long, Map<Long, OrderCountAndAmount>> statMap,
                                       int batchSize) {
+
+        // [WAS Sharding Logic]
+        users = users.stream()
+                .filter(u -> myWasInstanceHolder.isMyUser(u.getId()))
+                .toList();
 
         List<Badge> allBadges = badgeRepository.findAllByUserIn(users);
         Map<Long, List<Badge>> badgeMap = allBadges.stream()
@@ -161,6 +186,12 @@ public class JpaBadgeService {
      */
     @Transactional
     public Badge changeBadgeActivation(Long userId, Long categoryId, boolean active) {
+
+        // [WAS Sharding Logic]
+        if (!myWasInstanceHolder.isMyUser(userId)) {
+            return null;
+        }
+
         if (flagManager.isBadgeBatchRunning() || flagManager.isBadgeFlagged(userId, categoryId)) {
             throw new IllegalStateException("현재 해당 배지는 배치 처리 중입니다. 잠시 후 다시 시도해주세요.");
         }
@@ -184,6 +215,12 @@ public class JpaBadgeService {
      */
     @Transactional
     public Badge updateBadge(Long userId, Long categoryId) {
+        // [WAS Sharding Logic]
+        if (!myWasInstanceHolder.isMyUser(userId)) {
+            return null;
+        }
+
+
         if (flagManager.isBadgeBatchRunning() || flagManager.isBadgeFlagged(userId, categoryId)) {
             throw new IllegalStateException("현재 해당 배지는 배치 처리 중입니다. 잠시 후 다시 시도해주세요.");
         }
