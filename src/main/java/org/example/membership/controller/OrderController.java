@@ -7,6 +7,9 @@ import org.example.membership.dto.OrderRequest;
 import org.example.membership.dto.OrderResponse;
 import org.example.membership.entity.Order;
 import org.example.membership.service.jpa.JpaOrderService;
+import org.example.membership.config.MyWasInstanceHolder;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,10 +20,16 @@ import java.util.List;
 public class OrderController {
 
     private final JpaOrderService jpaOrderService;
+    private final MyWasInstanceHolder myWasInstanceHolder;
 
     @PostMapping
-    public OrderResponse createOrder(@RequestBody OrderCreateRequest order) {
-        return jpaOrderService.createOrder(order);
+    public ResponseEntity<?> createOrder(@RequestBody OrderCreateRequest order) {
+        if (!myWasInstanceHolder.isMyUser(order.getUserId())) {
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body("이 요청은 현재 WAS 인스턴스에서 처리하지 않습니다.");
+        }
+        OrderResponse resp = jpaOrderService.createOrder(order);
+        return ResponseEntity.ok(resp);
     }
 
 
