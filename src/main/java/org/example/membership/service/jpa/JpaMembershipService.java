@@ -4,7 +4,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.MembershipLevel;
-import org.example.membership.config.MyWasInstanceHolder;
 import org.example.membership.dto.UserStatusResponse;
 import org.example.membership.entity.Badge;
 import org.example.membership.entity.Category;
@@ -29,7 +28,6 @@ public class JpaMembershipService {
     private final CategoryRepository categoryRepository;
     private final MembershipLogRepository membershipLogRepository;
 
-    private final MyWasInstanceHolder myWasInstanceHolder;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -75,10 +73,6 @@ public class JpaMembershipService {
 
     @Transactional
     public User updateMembershipLevel(Long userId, MembershipLevel newLevel) {
-        // [WAS Sharding Logic]
-        if (!myWasInstanceHolder.isMyUser(userId)) {
-            return null;
-        }
 
         User user = getUserById(userId);
         user.setMembershipLevel(newLevel);
@@ -120,10 +114,7 @@ public class JpaMembershipService {
     public void bulkUpdateMembershipLevelsAndLog(List<User> users,
                                                  Map<Long, Long> activeBadgeMap,
                                                  int batchSize) {
-        // [WAS Sharding Logic]
-        users = users.stream()
-                .filter(u -> myWasInstanceHolder.isMyUser(u.getId()))
-                .toList();
+
 
         Map<Long, MembershipLevel> prevLevelMap = new HashMap<>();
         int count = 0;
@@ -170,11 +161,6 @@ public class JpaMembershipService {
 
     @Transactional
     public MembershipLog manualChangeLevel(Long userId, MembershipLevel newLevel) {
-
-        // [WAS Sharding Logic]
-        if (!myWasInstanceHolder.isMyUser(userId)) {
-            return null;
-        }
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));

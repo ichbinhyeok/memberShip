@@ -2,7 +2,6 @@ package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.enums.OrderStatus;
-import org.example.membership.config.MyWasInstanceHolder;
 import org.example.membership.dto.*;
 import org.example.membership.entity.*;
 import org.example.membership.exception.ConflictException;
@@ -30,15 +29,10 @@ public class JpaOrderService {
     private final CouponIssueLogRepository couponIssueLogRepository;
     private final CouponUsageRepository couponUsageRepository;
 
-    private final MyWasInstanceHolder myWasInstanceHolder;
 
     @Transactional
     public OrderResponse createOrder(OrderCreateRequest request) {
 
-        // [WAS Sharding Logic]
-        if (!myWasInstanceHolder.isMyUser(request.getUserId())) {
-            return null;
-        }
 
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new NotFoundException("User not found"));
@@ -118,10 +112,6 @@ public class JpaOrderService {
     @Transactional(readOnly = true)
     public List<OrderResponse> getOrdersByUserId(Long userId) {
 
-        // [WAS Sharding Logic]
-        if (!myWasInstanceHolder.isMyUser(userId)) {
-            return List.of();
-        }
         List<Order> orders = orderRepository.findByUser_Id(userId);
 
         return orders.stream().map(order -> {

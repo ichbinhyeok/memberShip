@@ -6,7 +6,9 @@ import org.example.membership.dto.*;
 import org.example.membership.entity.MembershipLog;
 import org.example.membership.entity.User;
 import org.example.membership.service.jpa.JpaMembershipService;
+import org.example.membership.config.MyWasInstanceHolder;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +19,7 @@ import java.util.List;
 public class UserController {
 
     private final JpaMembershipService jpaMembershipService;
+    private final MyWasInstanceHolder myWasInstanceHolder;
 
     @PostMapping
     public User createUser(@RequestBody CreateUserRequest request) {
@@ -61,10 +64,14 @@ public class UserController {
 
 
     @PostMapping("/level/manual")
-    public MembershipLogResponse manualChange(@RequestBody ManualMembershipLevelChangeRequest request) {
+    public ResponseEntity<?> manualChange(@RequestBody ManualMembershipLevelChangeRequest request) {
+        if (!myWasInstanceHolder.isMyUser(request.getUserId())) {
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body("이 요청은 현재 WAS 인스턴스에서 처리하지 않습니다.");
+        }
         MembershipLog log = jpaMembershipService.manualChangeLevel(request.getUserId(), request.getNewLevel());
         if (log == null) {
-            return null;
+            return ResponseEntity.ok().build();
         }
         MembershipLogResponse resp = new MembershipLogResponse();
         resp.setUserId(log.getUser().getId());
@@ -72,6 +79,6 @@ public class UserController {
         resp.setNewLevel(log.getNewLevel());
         resp.setChangeReason(log.getChangeReason());
         resp.setChangedAt(log.getChangedAt());
-        return resp;
+        return ResponseEntity.ok(resp);
     }
 }
