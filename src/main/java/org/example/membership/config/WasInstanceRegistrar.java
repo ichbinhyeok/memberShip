@@ -9,7 +9,12 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
+import java.net.InetAddress;
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
+
 @Component
 @RequiredArgsConstructor
 public class WasInstanceRegistrar implements ApplicationRunner {
@@ -17,18 +22,48 @@ public class WasInstanceRegistrar implements ApplicationRunner {
     private final WasInstanceRepository wasInstanceRepository;
     private final MyWasInstanceHolder myWasInstanceHolder;
 
-    @Value("${was.index}")
-    private int index;
-
     @Override
-    public void run(ApplicationArguments args) {
+    public void run(ApplicationArguments args) throws Exception {
+        String ip = InetAddress.getLocalHost().getHostAddress();
+        String hostname = InetAddress.getLocalHost().getHostName();
+        int port = Integer.parseInt(System.getProperty("server.port", "8080"));
+
         UUID uuid = UUID.randomUUID();
+
+        // 1. 내 인스턴스 등록
         WasInstance instance = new WasInstance();
         instance.setId(uuid);
-        instance.setIndex(index);
+        instance.setIp(ip);
+        instance.setHostname(hostname);
+        instance.setPort(port);
+        instance.setRegisteredAt(LocalDateTime.now());
+        instance.setLastHeartbeatAt(LocalDateTime.now());
+
         wasInstanceRepository.save(instance);
 
+        // 2. 전체 살아있는 인스턴스 조회 + 정렬
+        LocalDateTime threshold = LocalDateTime.now().minusSeconds(30);
+        List<WasInstance> aliveInstances = wasInstanceRepository.findAliveInstances(threshold)
+                .stream()
+                .sorted(Comparator.comparing(WasInstance::getRegisteredAt))
+                .toList();
+
+        // 3. 내 index 계산 (UUID 기준)
+        int myIndex = -1;
+        for (int i = 0; i < aliveInstances.size(); i++) {
+            if (aliveInstances.get(i).getId().equals(uuid)) {
+                myIndex = i;
+                break;
+            }
+        }
+
+        if (myIndex == -1) {
+            throw new IllegalStateException("등록한 인스턴스를 정렬 목록에서 찾지 못했습니다.");
+        }
+
+        // 4. 메모리에 보관
         myWasInstanceHolder.setMyUuid(uuid);
-        myWasInstanceHolder.setMyIndex(index);
+        myWasInstanceHolder.setMyIndex(myIndex);
+        myWasInstanceHolder.setTotalWases(aliveInstances.size());
     }
 }

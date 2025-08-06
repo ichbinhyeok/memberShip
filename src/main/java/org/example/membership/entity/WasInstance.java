@@ -18,9 +18,6 @@ public class WasInstance {
     @Id
     private UUID id;
 
-    @Column(name = "index_number", nullable = false)
-    private int index;
-
     @Enumerated(EnumType.STRING)
     private Status status = Status.RUNNING;
 
@@ -28,6 +25,17 @@ public class WasInstance {
 
     @Column(name = "last_heartbeat_at")
     private LocalDateTime lastHeartbeatAt;
+
+    @Column(name = "ip")
+    private String ip;
+
+    @Column(name = "port")
+    private int port;
+
+    @Column(name = "hostname")
+    private String hostname;
+
+
 
     public enum Status {
         RUNNING, TERMINATED

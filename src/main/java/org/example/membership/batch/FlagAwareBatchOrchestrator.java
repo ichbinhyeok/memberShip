@@ -47,13 +47,16 @@ public class FlagAwareBatchOrchestrator {
 
     public void runFullBatch(String targetDate, int batchSize) {
         UUID myUuid = myWasInstanceHolder.getMyUuid();
+        int index = myWasInstanceHolder.getMyIndex();
+        int total = myWasInstanceHolder.getTotalWases();
+
         log.info("[DEBUG] runFullBatch 시작 - targetDate={}, batchSize={}, myUuid={}", targetDate, batchSize, myUuid);
 
         WasInstance self = wasInstanceRepository.findById(myUuid)
                 .orElseThrow(() -> new IllegalStateException("WAS 인스턴스 정보 없음"));
 
-        int index = self.getIndex();
-        int total = (int) getAliveWasCount();
+
+
         log.info("[DEBUG] WAS 인덱스 정보: index={}, totalWAS={}", index, total);
 
         LocalDate date = LocalDate.parse(targetDate);

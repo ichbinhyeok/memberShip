@@ -11,12 +11,11 @@ import java.util.UUID;
 
 @Getter
 @Component
-@RequiredArgsConstructor
 public class MyWasInstanceHolder {
 
-    private final WasInstanceRepository wasInstanceRepository;
-    private UUID myUuid;    // 초기화 없이 set으로 주입
-    private int myIndex;    // 초기화 없이 set으로 주입
+    private UUID myUuid;
+    private int myIndex;
+    private int totalWases;
 
     public void setMyUuid(UUID uuid) {
         this.myUuid = uuid;
@@ -26,13 +25,18 @@ public class MyWasInstanceHolder {
         this.myIndex = index;
     }
 
-    public int getTotalWas() {
-        LocalDateTime threshold = LocalDateTime.now().minusSeconds(30);
-        return wasInstanceRepository.findAliveInstances(threshold).size();
+    public void setTotalWases(int total) {
+        this.totalWases = total;
     }
 
     public boolean isMyUser(Long userId) {
         if (userId == null) return true;
-        return userId % getTotalWas() == myIndex;
+        return userId % totalWases == myIndex;
+    }
+
+    public boolean isClusterChanged() {
+        // 예: 헬스 체크 감지 후 total 변화 확인 (추후 확장 가능)
+        return false;
     }
 }
+
