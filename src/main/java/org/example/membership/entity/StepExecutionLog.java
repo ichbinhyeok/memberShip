@@ -28,5 +28,8 @@ public class StepExecutionLog {
     private boolean levelDone = false;
     private boolean couponDone = false;
 
+    private boolean interrupted = false;
+
+    private LocalDateTime startedAt;
     private LocalDateTime updatedAt;
 }

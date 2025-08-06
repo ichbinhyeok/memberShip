@@ -3,6 +3,7 @@ package org.example.membership.batch;
 import lombok.RequiredArgsConstructor;
 import org.example.membership.common.concurrent.FlagManager;
 import org.example.membership.common.util.PartitionUtils;
+import org.example.membership.exception.ScaleOutInterruptedException;
 import org.example.membership.service.jpa.JpaBadgeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,11 +60,17 @@ public class BadgeBatchExecutor {
                 try {
                     for (int start = 0; start < part.size(); start += 1000) {
                         int end = Math.min(start + 1000, part.size());
+                        // 💡인터럽트 감지 추가
+                        interruptIfNeededInChunk("partition-" + partitionIndex + " chunk " + start + "~" + end);
+
+
                         List<String> chunk = part.subList(start, end);
-                        log.debug("[DEBUG] 파티션 {} - chunk: {} ~ {}", partitionIndex, start, end);
+
+
                         jpaBadgeService.bulkUpdateBadgeStates(chunk, batchSize);
                         localCount += chunk.size();
                     }
+
                     long duration = Duration.between(partitionStart, Instant.now()).toMillis();
                     log.info("[배지 파티션 완료] #{} | 처리 수: {} | 소요 시간: {}ms",
                             partitionIndex, localCount, duration);
@@ -95,5 +102,13 @@ public class BadgeBatchExecutor {
 
         long total = Duration.between(totalStart, Instant.now()).toMillis();
         log.info("[병렬 배지 갱신 완료] 전체 대상: {}개 | 총 소요 시간: {}ms", keysToUpdate.size(), total);
+    }
+
+    //  인터럽트 감지 메서드 (RuntimeException으로 처리)
+    private void interruptIfNeededInChunk(String context) {
+        if (flagManager.isScaleOutInterrupted()) {
+            log.warn("[인터럽트 감지] 청크 처리 도중 인터럽트 발생. 중단. (context={})", context);
+            throw new ScaleOutInterruptedException("스케일아웃 감지됨: " + context);
+        }
     }
 }

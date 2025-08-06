@@ -1,8 +1,10 @@
 package org.example.membership.batch;
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.common.concurrent.FlagManager;
 import org.example.membership.common.util.PartitionUtils;
 import org.example.membership.entity.User;
+import org.example.membership.exception.ScaleOutInterruptedException;
 import org.example.membership.repository.jpa.BadgeRepository;
 import org.example.membership.service.jpa.JpaMembershipService;
 import org.slf4j.Logger;
@@ -24,6 +26,7 @@ public class UserLevelBatchExecutor {
 
     private final JpaMembershipService jpaMembershipService;
     private final BadgeRepository badgeRepository;
+    private final FlagManager flagManager;
 
     public void execute(List<User> users, int batchSize) {
         if (users == null || users.isEmpty()) {
@@ -50,6 +53,10 @@ public class UserLevelBatchExecutor {
                 try {
                     for (int start = 0; start < part.size(); start += 1000) {
                         int end = Math.min(start + 1000, part.size());
+
+                        // 💡 인터럽트 감지 (처리 직전)
+                        interruptIfNeededInChunk("partition-" + partitionIndex + " chunk " + start + "~" + end);
+
                         List<User> chunk = part.subList(start, end);
                         if (chunk.isEmpty()) continue;
 
@@ -92,5 +99,12 @@ public class UserLevelBatchExecutor {
             map.put(userId, count);
         }
         return map;
+    }
+
+    private void interruptIfNeededInChunk(String context) {
+        if (flagManager.isScaleOutInterrupted()) {
+            log.warn("[인터럽트 감지] 등급 청크 처리 중단. context={}", context);
+            throw new ScaleOutInterruptedException("스케일아웃 감지됨: " + context);
+        }
     }
 }

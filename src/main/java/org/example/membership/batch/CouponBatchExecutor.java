@@ -1,8 +1,10 @@
 package org.example.membership.batch;
 
 import lombok.RequiredArgsConstructor;
+import org.example.membership.common.concurrent.FlagManager;
 import org.example.membership.common.util.PartitionUtils;
 import org.example.membership.entity.User;
+import org.example.membership.exception.ScaleOutInterruptedException;
 import org.example.membership.service.jpa.JpaCouponService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +25,7 @@ public class CouponBatchExecutor {
     private static final Logger log = LoggerFactory.getLogger(CouponBatchExecutor.class);
 
     private final JpaCouponService jpaCouponService;
+    private final FlagManager flagManager;
 
     public void execute(List<User> users, int batchSize) {
         if (users == null || users.isEmpty()) {
@@ -49,12 +52,17 @@ public class CouponBatchExecutor {
                 try {
                     for (int start = 0; start < part.size(); start += 1000) {
                         int end = Math.min(start + 1000, part.size());
+
+                        //  인터럽트 감지 추가
+                        interruptIfNeededInChunk("partition-" + partitionIndex + " chunk " + start + "~" + end);
+
                         List<User> chunk = part.subList(start, end);
                         if (chunk.isEmpty()) continue;
 
                         jpaCouponService.bulkIssueCoupons(chunk, batchSize);
                         localCount += chunk.size();
                     }
+
                     long duration = Duration.between(partitionStart, Instant.now()).toMillis();
                     log.info("[쿠폰 발급 파티션 완료] #{} 쓰레드: {} | 처리 수: {} | 소요 시간: {}ms",
                             partitionIndex, Thread.currentThread().getName(), localCount, duration);
@@ -78,5 +86,12 @@ public class CouponBatchExecutor {
 
         long total = Duration.between(totalStart, Instant.now()).toMillis();
         log.info("[쿠폰 발급 완료] 전체 대상: {} | 총 소요 시간: {}ms", users.size(), total);
+    }
+
+    private void interruptIfNeededInChunk(String context) {
+        if (flagManager.isScaleOutInterrupted()) {
+            log.warn("[인터럽트 감지] 쿠폰 청크 처리 중단. context={}", context);
+            throw new ScaleOutInterruptedException("스케일아웃 감지됨: " + context);
+        }
     }
 }

@@ -9,6 +9,7 @@ import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.StepExecutionLog;
 import org.example.membership.entity.User;
 import org.example.membership.entity.WasInstance;
+import org.example.membership.exception.ScaleOutInterruptedException;
 import org.example.membership.repository.jpa.StepExecutionLogRepository;
 import org.example.membership.repository.jpa.WasInstanceRepository;
 import org.example.membership.service.jpa.JpaBadgeService;
@@ -55,8 +56,6 @@ public class FlagAwareBatchOrchestrator {
         WasInstance self = wasInstanceRepository.findById(myUuid)
                 .orElseThrow(() -> new IllegalStateException("WAS 인스턴스 정보 없음"));
 
-
-
         log.info("[DEBUG] WAS 인덱스 정보: index={}, totalWAS={}", index, total);
 
         LocalDate date = LocalDate.parse(targetDate);
@@ -68,6 +67,9 @@ public class FlagAwareBatchOrchestrator {
         log.info(" ├─ [1] 통계 집계 완료: {}ms", time1);
 
         for (int retryCount = 0; retryCount <= MAX_RETRIES; retryCount++) {
+            StepExecutionLog stepLog = null;
+            boolean completed = false;
+
             if (retryCount > 0) {
                 flagManager.clearAllFlags();
                 log.info("[재시작 초기화] 플래그 초기화 완료 (retry={})", retryCount);
@@ -83,9 +85,9 @@ public class FlagAwareBatchOrchestrator {
 
             try {
                 Instant allStart = Instant.now();
-                long time2, time3, badgeTime = 0, levelTime = 0, couponTime = 0;
+                long time2, time3;
 
-                StepExecutionLog stepLog = stepLogRepository
+                stepLog = stepLogRepository
                         .findByTargetDateAndWasIndex(date, index)
                         .orElseGet(() -> {
                             StepExecutionLog log = new StepExecutionLog();
@@ -138,15 +140,30 @@ public class FlagAwareBatchOrchestrator {
                     log.info("[Step6] 쿠폰 발급 스킵");
                 }
 
-                flagManager.endGlobalBadgeBatch();
+                completed = true;
                 long totalTime = Duration.between(allStart, Instant.now()).toMillis();
                 log.info("[배치 완료] 전체 시간: {}ms", totalTime);
                 return;
 
+            } catch (ScaleOutInterruptedException e) {
+                log.warn("[배치 중단] 스케일아웃 인터럽트 감지됨: {}", e.getMessage());
+                if (stepLog != null) {
+                    stepLog.setInterrupted(true);
+                    stepLogRepository.save(stepLog);
+                }
+                flagManager.resetScaleOutInterruptFlag();
+                throw e;
+
+
             } catch (Exception e) {
-                flagManager.endGlobalBadgeBatch();
                 log.error("[배치 실패] 예외 발생", e);
                 throw new RuntimeException(e);
+
+            } finally {
+                // 정상 종료 또는 예외 모두에 대해 플래그 종료
+                if (!completed) {
+                    flagManager.endGlobalBadgeBatch();
+                }
             }
         }
 
@@ -157,7 +174,7 @@ public class FlagAwareBatchOrchestrator {
         long currentAlive = getAliveWasCount();
         if (currentAlive != total) {
             log.warn("[스케일아웃 감지] 기존 total={} → 현재={}. 재시작", total, currentAlive);
-            throw new IllegalStateException("WAS 수 변경 감지");
+            throw new ScaleOutInterruptedException("WAS 수 변경 감지됨: 기존=" + total + ", 현재=" + currentAlive);
         }
     }
 
