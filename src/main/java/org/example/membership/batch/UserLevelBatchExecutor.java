@@ -91,7 +91,12 @@ public class UserLevelBatchExecutor {
     }
 
     private Map<Long, Long> getActiveBadgeCountMap(List<User> users) {
-        List<Object[]> counts = badgeRepository.countActiveBadgesGroupedByUserId();
+        List<Long> userIds = users.stream()
+                .map(User::getId)
+                .toList();
+
+        List<Object[]> counts = badgeRepository.countActiveBadgesGroupedByUserIds(userIds);
+
         Map<Long, Long> map = new HashMap<>();
         for (Object[] row : counts) {
             Long userId = ((Number) row[0]).longValue();
@@ -100,6 +105,7 @@ public class UserLevelBatchExecutor {
         }
         return map;
     }
+
 
     private void interruptIfNeededInChunk(String context) {
         if (flagManager.isScaleOutInterrupted()) {
