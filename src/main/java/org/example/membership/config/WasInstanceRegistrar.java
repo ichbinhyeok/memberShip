@@ -1,8 +1,10 @@
 package org.example.membership.config;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.membership.config.MyWasInstanceHolder;
 import org.example.membership.entity.WasInstance;
+import org.example.membership.infra.cluster.ScaleOutNotifier;
 import org.example.membership.repository.jpa.WasInstanceRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
@@ -17,10 +19,13 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class WasInstanceRegistrar implements ApplicationRunner {
 
     private final WasInstanceRepository wasInstanceRepository;
     private final MyWasInstanceHolder myWasInstanceHolder;
+    private final ScaleOutNotifier scaleOutNotifier;
+
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
@@ -65,5 +70,16 @@ public class WasInstanceRegistrar implements ApplicationRunner {
         myWasInstanceHolder.setMyUuid(uuid);
         myWasInstanceHolder.setMyIndex(myIndex);
         myWasInstanceHolder.setTotalWases(aliveInstances.size());
+
+
+        // 5. 다른 인스턴스에게 Scale-out 알림 전송
+        List<WasInstance> others = aliveInstances.stream()
+                .filter(was -> !was.getId().equals(uuid))
+                .toList();
+
+        if (!others.isEmpty()) {
+            log.info("Scale-out 알림 대상 WAS 수: {}", others.size());
+            scaleOutNotifier.notifyOthers(others);
+        }
     }
 }

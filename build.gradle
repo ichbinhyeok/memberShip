@@ -57,6 +57,8 @@ dependencies {
     implementation 'com.github.f4b6a3:uuid-creator:5.3.6'
 
 
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
 
 }
 

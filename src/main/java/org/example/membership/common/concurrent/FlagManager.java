@@ -11,6 +11,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class FlagManager {
 
     private final AtomicBoolean globalBadgeBatchFlag = new AtomicBoolean(false);
+    private final AtomicBoolean scaleOutInterruptFlag = new AtomicBoolean(false);
+
+
     private final Set<String> badgeFlags = ConcurrentHashMap.newKeySet();
 
     public void startGlobalBadgeBatch() {
@@ -39,6 +42,18 @@ public class FlagManager {
 
     public void removeBadgeFlag(Long userId, Long categoryId) {
         badgeFlags.remove(key(userId, categoryId));
+    }
+
+    public void raiseScaleOutInterruptFlag() {
+        scaleOutInterruptFlag.set(true);
+    }
+
+    public boolean isScaleOutInterrupted() {
+        return scaleOutInterruptFlag.get();
+    }
+
+    public void resetScaleOutInterruptFlag() {
+        scaleOutInterruptFlag.set(false);
     }
 
     public void clearAllFlags() {
