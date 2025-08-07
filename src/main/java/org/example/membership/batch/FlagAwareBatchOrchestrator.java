@@ -127,7 +127,7 @@ public class FlagAwareBatchOrchestrator {
 
                 if (!stepLog.isBadgeDone()) {
                     log.info("[Step4] 배지 갱신 시작");
-                    badgeBatchExecutor.execute(keysToFlag, batchSize);
+                    badgeBatchExecutor.execute(keysToFlag, batchSize,batchLog);
                 } else {
                     log.info("[Step4] 배지 갱신 스킵");
                 }
@@ -136,7 +136,7 @@ public class FlagAwareBatchOrchestrator {
 
                 if (!stepLog.isLevelDone()) {
                     log.info("[Step5] 등급 갱신 시작");
-                    userLevelBatchExecutor.execute(users, batchSize);
+                    userLevelBatchExecutor.execute(users, batchSize,batchLog);
                 } else {
                     log.info("[Step5] 등급 갱신 스킵");
                 }
@@ -145,7 +145,7 @@ public class FlagAwareBatchOrchestrator {
 
                 if (!stepLog.isCouponDone()) {
                     log.info("[Step6] 쿠폰 발급 시작");
-                    couponBatchExecutor.execute(users, batchSize);
+                    couponBatchExecutor.execute(users, batchSize,batchLog);
                 } else {
                     log.info("[Step6] 쿠폰 발급 스킵");
                 }

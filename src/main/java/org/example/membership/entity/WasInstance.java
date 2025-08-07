@@ -26,6 +26,10 @@ public class WasInstance {
     @Column(name = "last_heartbeat_at")
     private LocalDateTime lastHeartbeatAt;
 
+    @Column(name = "index_number", nullable = false)
+    private int indexNumber;
+
+
     @Column(name = "ip")
     private String ip;
 

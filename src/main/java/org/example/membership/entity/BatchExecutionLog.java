@@ -21,15 +21,16 @@ public class BatchExecutionLog {
     private Long id;
 
     // 배치 식별용 UUID (WAS별로 배치 인스턴스를 구분하기 위함)
-    @Column(nullable = false, unique = true, updatable = false)
+    @Column(name = "execution_id", nullable = false, unique = true, updatable = false)
     private UUID executionId;
 
+
     // 배치를 수행한 WAS UUID
-    @Column(nullable = false)
+    @Column(name = "was_id", nullable = false)
     private UUID wasId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "was_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @JoinColumn(name = "was_id", insertable = false, updatable = false)
     private WasInstance wasInstance;
 
     // 배치 대상 날짜 (ex: '2025-08-01')
