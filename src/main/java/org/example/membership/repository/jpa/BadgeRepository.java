@@ -44,5 +44,11 @@ public interface BadgeRepository extends JpaRepository<Badge, Long> {
     """)
     List<Object[]> countActiveBadgesGroupedByUserIds(@Param("userIds") List<Long> userIds);
 
+    @Query("""
+    SELECT CONCAT(b.user.id, ':', b.category.id)
+    FROM Badge b
+    WHERE b.user.id BETWEEN :start AND :end
+    """)
+    List<String> findKeysByUserIdRange(@Param("start") Long start, @Param("end") Long end);
 }
 

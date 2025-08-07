@@ -17,4 +17,12 @@ public interface WasInstanceRepository extends JpaRepository<WasInstance, UUID> 
     @Query("SELECT w FROM WasInstance w WHERE w.lastHeartbeatAt >= :threshold")
     List<WasInstance> findAliveInstances(@Param("threshold") LocalDateTime threshold);
 
+
+    @Query("SELECT COUNT(w) FROM WasInstance w WHERE w.lastHeartbeatAt >= :threshold")
+    long countAliveInstances(@Param("threshold") LocalDateTime threshold);
+
+
+
 }
+
+

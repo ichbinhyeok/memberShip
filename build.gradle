@@ -33,7 +33,7 @@ dependencies {
     // Database
     implementation 'com.mysql:mysql-connector-j:8.0.33'
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3'
-
+    testImplementation 'com.h2database:h2'
     // Monitoring
     implementation 'io.micrometer:micrometer-registry-prometheus'
 
@@ -53,11 +53,11 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
 
+
     implementation 'p6spy:p6spy:3.9.1'
     implementation 'com.github.f4b6a3:uuid-creator:5.3.6'
 
 
-    implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
 
 }

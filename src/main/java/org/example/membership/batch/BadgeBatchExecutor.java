@@ -77,7 +77,7 @@ public class BadgeBatchExecutor {
                     long userIdEnd = extractMaxUserId(chunk);
                     String rangeKey = userIdStart + "-" + userIdEnd;
 
-                    // ✅ 스킵 로직 적용
+                    //  스킵 로직 적용
                     if (completedRangeKeys.contains(rangeKey)) {
                         log.info("[청크 스킵] 이미 완료된 범위: {}~{}", userIdStart, userIdEnd);
                         continue;
