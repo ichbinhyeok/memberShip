@@ -37,4 +37,15 @@ public interface ChunkExecutionLogRepository extends JpaRepository<ChunkExecutio
             @Param("batchExecutionLog") BatchExecutionLog batchExecutionLog,
             @Param("stepType") ChunkExecutionLog.StepType stepType
     );
+
+    @Query("""
+    SELECT c FROM ChunkExecutionLog c
+    WHERE c.batchExecutionLog = :batchExecutionLog
+      AND c.restored = false
+      AND c.completed = false
+    ORDER BY c.userIdStart
+    """)
+    List<ChunkExecutionLog> findUnrestoredUncompletedChunksOrderByUserIdStart(
+            @Param("batchExecutionLog") BatchExecutionLog batchExecutionLog
+    );
 }

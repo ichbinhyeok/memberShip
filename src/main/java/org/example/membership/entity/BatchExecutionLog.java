@@ -20,20 +20,13 @@ public class BatchExecutionLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 배치 식별용 UUID (WAS별로 배치 인스턴스를 구분하기 위함)
     @Column(name = "execution_id", nullable = false, unique = true, updatable = false)
     private UUID executionId;
-
-
-    // 배치를 수행한 WAS UUID
-    @Column(name = "was_id", nullable = false)
-    private UUID wasId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "was_id", insertable = false, updatable = false)
     private WasInstance wasInstance;
 
-    // 배치 대상 날짜 (ex: '2025-08-01')
     @Column(nullable = false)
     private String targetDate;
 
@@ -41,50 +34,56 @@ public class BatchExecutionLog {
     @Column(nullable = false)
     private BatchStatus status;
 
-    // 오토스케일링에 의한 중단 여부
     @Column(nullable = false)
     private boolean interruptedByScaleOut;
 
-    // 인터럽트 시각
     private LocalDateTime interruptedAt;
 
-    // 복원 시작 시각
     private LocalDateTime restoredAt;
 
-    // 실제 배치 시작 시간
     @CreationTimestamp
     private LocalDateTime startedAt;
 
-    // 배치 종료 시간 (중단 or 성공 모두 포함)
     @UpdateTimestamp
     private LocalDateTime endedAt;
 
-    // 상태를 갱신하는 메서드
-    public void markInterrupted() {
+    // --- 상태 메서드 ---
+    /** 스케일아웃으로 인한 중단 */
+    public void markInterruptedByScaleOut() {
         this.status = BatchStatus.INTERRUPTED;
         this.interruptedByScaleOut = true;
         this.interruptedAt = LocalDateTime.now();
     }
 
+    /** 일반 실패로 인한 중단 */
+    public void markFailed() {
+        this.status = BatchStatus.INTERRUPTED;
+        this.interruptedByScaleOut = false;
+        this.interruptedAt = LocalDateTime.now();
+    }
+
+    /** 복원 상태로 변경 */
     public void markRestoring() {
         this.status = BatchStatus.RESTORING;
         this.restoredAt = LocalDateTime.now();
     }
 
+    /** 정상 완료 */
     public void markCompleted() {
         this.status = BatchStatus.COMPLETED;
         this.endedAt = LocalDateTime.now();
     }
 
+    /** 실행 중 상태 */
     public void markRunning() {
         this.status = BatchStatus.RUNNING;
     }
 
     public enum BatchStatus {
-        PENDING,    // 생성만 됐지만 아직 실행 X
-        RUNNING,    // 정상 실행 중
-        INTERRUPTED,// 인터럽트 상태 (scale-out으로 인한 중단)
-        RESTORING,  // 복원 중
-        COMPLETED   // 정상 완료
+        PENDING,
+        RUNNING,
+        INTERRUPTED,
+        RESTORING,
+        COMPLETED
     }
 }

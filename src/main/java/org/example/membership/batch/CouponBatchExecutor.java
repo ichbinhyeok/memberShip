@@ -41,7 +41,7 @@ public class CouponBatchExecutor {
         // ✅ 완료된 청크 스킵용 조회
         UUID executionId = batchExecutionLog.getExecutionId();
         List<ChunkExecutionLog> completedChunks = chunkExecutionLogRepository
-                .findCompletedChunks(executionId, ChunkExecutionLog.StepType.COUPON.COUPON);
+                .findCompletedChunks(executionId, ChunkExecutionLog.StepType.COUPON);
         Set<String> completedRangeKeys = new HashSet<>();
         for (ChunkExecutionLog log : completedChunks) {
             completedRangeKeys.add(log.getUserIdStart() + "-" + log.getUserIdEnd());
@@ -123,7 +123,7 @@ public class CouponBatchExecutor {
         try {
             ChunkExecutionLog log = ChunkExecutionLog.builder()
                     .batchExecutionLog(batchExecutionLog)
-                    .stepType(ChunkExecutionLog.StepType.COUPON.COUPON)
+                    .stepType(ChunkExecutionLog.StepType.COUPON)
                     .wasId(myWasInstanceHolder.getMyUuid())
                     .recordedAt(LocalDateTime.now())
                     .userIdStart(userIdStart)

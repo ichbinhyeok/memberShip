@@ -25,7 +25,7 @@ public class ChunkExecutionLog {
 
     //어떤 배치의 청크인지 → 복원 기준의 핵심 키
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "batch_execution_id", referencedColumnName = "execution_id", nullable = false)
+    @JoinColumn(name = "batch_execution_id", nullable = false)
     private BatchExecutionLog batchExecutionLog;
 
     //어떤 WAS가 이 청크를 실행했는가
