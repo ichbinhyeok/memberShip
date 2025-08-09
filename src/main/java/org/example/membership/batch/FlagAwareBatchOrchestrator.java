@@ -56,7 +56,7 @@ public class FlagAwareBatchOrchestrator {
         final int index = myWasInstanceHolder.getMyIndex();
         final int total = myWasInstanceHolder.getTotalWases();
 
-        // 활성 배치(해당 날짜) 존재 시 보류
+        // 활성 배치(해당 날짜) 존재 시 보류 // 배치를 하고 싶다면 INTERRUPTED상태 즉 배치가 다 멈춘 상태에서만(정합성)
         long activeForDate = batchExecutionLogRepository.countActiveForTargetDate(
                 targetDate, BatchStatus.RUNNING, BatchStatus.RESTORING);
         if (activeForDate > 0) {
@@ -128,19 +128,30 @@ public class FlagAwareBatchOrchestrator {
 
                     if (!stepLog.isBadgeDone()) {
                         badgeBatchExecutor.execute(keysToFlag, batchSize, batchLog);
+                        stepLog.setBadgeDone(true);
+                        stepLogRepository.save(stepLog);
+                        stepLogRepository.flush();
                     }
+
 
                     currentAliveCheck(total);
 
                     if (!stepLog.isLevelDone()) {
                         userLevelBatchExecutor.execute(users, batchSize, batchLog);
+                        stepLog.setLevelDone(true);
+                        stepLogRepository.save(stepLog);
+                        stepLogRepository.flush();
                     }
 
                     currentAliveCheck(total);
 
                     if (!stepLog.isCouponDone()) {
                         couponBatchExecutor.execute(users, batchSize, batchLog);
+                        stepLog.setCouponDone(true);
+                        stepLogRepository.save(stepLog);
+                        stepLogRepository.flush();
                     }
+
 
                     completed = true;
                     batchLog.markCompleted();

@@ -43,6 +43,12 @@ public class FlagManager {
     public boolean isBadgeFlagged(Long userId, Long categoryId) { return badgeFlags.contains(key(userId, categoryId)); }
     public void removeBadgeFlag(Long userId, Long categoryId) { badgeFlags.remove(key(userId, categoryId)); }
 
+
+    public boolean isBadgeBatchRunning() {
+        // 전역 게이트가 켜졌거나(클러스터 차단), 현재 프로세스에서 오케스트레이터가 실행 중이면 true
+        return isGlobalApiGateOn() || isOrchestratorRunning();
+    }
+
     // 재시작 시 휘발성만 정리
     public void clearTransientFlags() {
         badgeFlags.clear();

@@ -133,9 +133,10 @@ public class JpaOrderService {
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
+        //Object[] = userId, categoryId, itemCount, totalSpent
         List<Object[]> aggregates = orderRepository.aggregateByUserAndCategoryBetween(startDateTime, endDateTime);
 
-        Map<Long, Map<Long, OrderCountAndAmount>> statMap = new HashMap<>();
+        Map<Long, Map<Long, OrderCountAndAmount>> statMap = new HashMap<>();//<UserId,<카테고리 ID,사용금액>>
 
         for (Object[] row : aggregates) {
             Long userId = (Long) row[0];
@@ -144,6 +145,7 @@ public class JpaOrderService {
             BigDecimal amount = (BigDecimal) row[3];
 
             Map<Long, OrderCountAndAmount> categoryMap = statMap.computeIfAbsent(userId, k -> new HashMap<>());
+
             categoryMap.put(categoryId, new OrderCountAndAmount(count, amount));
         }
 

@@ -36,7 +36,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             "JOIN products p ON oi.product_id = p.id " +
             "LEFT JOIN coupons c ON o.coupon_id = c.id " +
             "WHERE o.status = 'PAID' AND o.ordered_at BETWEEN :start AND :end " +
-            "GROUP BY o.user_id, p.category_id", nativeQuery = true)
+            "GROUP BY o.user_id, p.category_id"+
+            "ORDER BY o.user_id,p.category_id", nativeQuery = true)
     List<Object[]> aggregateByUserAndCategoryBetween(
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end

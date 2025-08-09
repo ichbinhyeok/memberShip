@@ -7,10 +7,9 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx-1.conf:/etc/nginx/nginx.conf:ro   # 초기엔 was1만
     depends_on:
       - was1
-      - was2
 
   was1:
     build:
@@ -21,7 +20,8 @@ services:
     volumes:
       - ./app:/app
     command: >
-      java -jar /app/app.jar --spring.config.location=file:/app/application.yml,file:/app/application-0.yml
+      java -jar /app/app.jar
+      --spring.config.location=file:/app/application.yml
 
   was2:
     build:
@@ -32,5 +32,5 @@ services:
     volumes:
       - ./app:/app
     command: >
-      java -jar /app/app.jar --spring.config.location=file:/app/application.yml,file:/app/application-1.yml
-
+      java -jar /app/app.jar
+      --spring.config.location=file:/app/application.yml
