@@ -1,15 +1,14 @@
-package org.example.membership.repository.jpa;
+package org.example.membership.repository.jpa.batch;
 
-import org.example.membership.entity.BatchExecutionLog;
+import org.example.membership.entity.batch.BatchExecutionLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.example.membership.entity.BatchExecutionLog.BatchStatus;
+import org.example.membership.entity.batch.BatchExecutionLog.BatchStatus;
 
 
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
 
 public interface BatchExecutionLogRepository extends JpaRepository<BatchExecutionLog,Long> {
@@ -47,13 +46,18 @@ public interface BatchExecutionLogRepository extends JpaRepository<BatchExecutio
 
 
     @Query("""
-      select count(b) from BatchExecutionLog b
-      where b.targetDate = :targetDate
-        and b.status in (:s1, :s2)
-    """)
-    long countActiveForTargetDate(@Param("targetDate") String targetDate,
-                                  @Param("s1") BatchStatus s1,
-                                  @Param("s2") BatchStatus s2);
+    select count(b) 
+    from BatchExecutionLog b
+    join b.wasInstance wi
+    where b.targetDate = :targetDate
+      and b.status in (:s1, :s2)
+      and wi.lastHeartbeatAt >= :threshold
+""")
+    long countAliveActiveForTargetDate(@Param("targetDate") String targetDate,
+                                       @Param("s1") BatchStatus s1,
+                                       @Param("s2") BatchStatus s2,
+                                       @Param("threshold") LocalDateTime threshold);
+
 
     @Query("""
       select b from BatchExecutionLog b
@@ -88,6 +92,9 @@ public interface BatchExecutionLogRepository extends JpaRepository<BatchExecutio
                                        @Param("s2") BatchStatus s2,
                                        @Param("threshold") LocalDateTime threshold);
 
+
+
+    List<BatchExecutionLog> findByStatus(BatchStatus status);
 
 }
 

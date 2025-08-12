@@ -1,10 +1,12 @@
-package org.example.membership.entity;
+package org.example.membership.entity.batch;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.example.membership.entity.WasInstance;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -29,6 +31,9 @@ public class BatchExecutionLog {
 
     @Column(nullable = false)
     private String targetDate;
+
+    @Column(name = "cutoff_at")
+    private LocalDateTime cutoffAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

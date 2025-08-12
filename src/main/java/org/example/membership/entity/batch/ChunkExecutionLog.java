@@ -1,4 +1,4 @@
-package org.example.membership.entity;
+package org.example.membership.entity.batch;
 import jakarta.persistence.*;
 import lombok.*;
 

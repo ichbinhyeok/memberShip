@@ -1,8 +1,8 @@
 package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
-import org.example.membership.entity.ChunkExecutionLog;
-import org.example.membership.repository.jpa.ChunkExecutionLogRepository;
+import org.example.membership.entity.batch.ChunkExecutionLog;
+import org.example.membership.repository.jpa.batch.ChunkExecutionLogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

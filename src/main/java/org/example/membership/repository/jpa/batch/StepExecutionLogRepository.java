@@ -1,6 +1,6 @@
-package org.example.membership.repository.jpa;
+package org.example.membership.repository.jpa.batch;
 
-import org.example.membership.entity.StepExecutionLog;
+import org.example.membership.entity.batch.StepExecutionLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;

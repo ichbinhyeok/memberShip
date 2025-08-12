@@ -1,7 +1,7 @@
-package org.example.membership.repository.jpa;
+package org.example.membership.repository.jpa.batch;
 
-import org.example.membership.entity.BatchExecutionLog;
-import org.example.membership.entity.ChunkExecutionLog;
+import org.example.membership.entity.batch.BatchExecutionLog;
+import org.example.membership.entity.batch.ChunkExecutionLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
