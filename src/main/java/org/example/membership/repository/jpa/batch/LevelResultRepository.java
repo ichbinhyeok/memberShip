@@ -15,5 +15,7 @@ public interface LevelResultRepository extends JpaRepository<LevelResult,Long> {
     @Transactional
     @Modifying
     void deleteByExecutionId(UUID executionId);
-}
+
+    List<LevelResult> findByExecutionIdAndStatusAndUserIdBetween(
+            UUID executionId, BatchResultStatus status, long startUserId, long endUserId);}
 

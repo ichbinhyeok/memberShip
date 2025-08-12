@@ -28,77 +28,69 @@ public class BatchResultApplier {
     private final BadgeRepository badgeRepository;
     private final UserRepository userRepository;
 
-    /**
-     * 지정된 executionId에 대한 모든 계산 결과를 라이브 DB에 반영합니다.
-     */
-    public void applyResults(UUID executionId) {
-        log.info("[결과 반영 시작] executionId={}", executionId);
-
-        applyBadgeResults(executionId);
-        applyLevelResults(executionId);
-
+    @Transactional
+    public void applyResults(UUID executionId, long startUserId, long endUserId) {
+        log.info("[결과 반영 시작] executionId={}, range=[{}~{}]", executionId, startUserId, endUserId);
+        applyBadgeResults(executionId, startUserId, endUserId);
+        applyLevelResults(executionId, startUserId, endUserId);
         log.info("[결과 반영 완료] executionId={}", executionId);
     }
 
-    /**
-     * 배지 계산 결과를 라이브 badge 테이블에 반영합니다.
-     * 이 메서드는 독립적인 트랜잭션으로 실행됩니다.
-     */
-    @Transactional
-    public void applyBadgeResults(UUID executionId) {
-        List<BadgeResult> pendingBadges = badgeResultRepository.findByExecutionIdAndStatus(executionId, BatchResultStatus.PENDING);
+
+    public void applyBadgeResults(UUID executionId, long startUserId, long endUserId) {
+        List<BadgeResult> pendingBadges =
+                badgeResultRepository.findByExecutionIdAndStatusAndUserIdBetween(
+                        executionId, BatchResultStatus.PENDING, startUserId, endUserId);
+
         if (pendingBadges.isEmpty()) {
-            log.info("[배지 결과] 반영할 내용 없음. executionId={}", executionId);
+            log.info("[배지 결과] 반영할 내용 없음. executionId={}, range=[{}~{}]",
+                    executionId, startUserId, endUserId);
             return;
         }
 
-        log.info("[배지 결과] {}건 반영 시작...", pendingBadges.size());
-        for (BadgeResult result : pendingBadges) {
-            // "Batch Wins" 정책에 따라 조건 없이 덮어쓰기
-            Badge badge = badgeRepository.findByUserIdAndCategoryId(result.getUserId(), result.getCategoryId())
-                    .orElseGet(() -> {
-                        // 혹시 배지가 없는 경우를 대비한 방어 코드
-                        log.warn("배지를 찾을 수 없어 새로 생성합니다. userId={}, categoryId={}", result.getUserId(), result.getCategoryId());
-                        Badge newBadge = new Badge();
-                        // user, category 엔티티를 찾아 설정해야 하지만, 예제에서는 간단히 처리
-                        // newBadge.setUser(userRepository.findById(result.getUserId()).orElseThrow());
-                        // newBadge.setCategory(categoryRepository.findById(result.getCategoryId()).orElseThrow());
-                        return newBadge;
-                    });
+        log.info("[배지 결과] {}건 반영 시작 executionId={}, range=[{}~{}]",
+                pendingBadges.size(), executionId, startUserId, endUserId);
 
-            if (result.isNewState()) {
-                badge.activate();
-            } else {
-                badge.deactivate();
+        for (BadgeResult result : pendingBadges) {
+            // 배지 엔티티 조회
+            var opt = badgeRepository.findByUserIdAndCategoryId(result.getUserId(), result.getCategoryId());
+            if (opt.isEmpty()) {
+                // 지금은 생성하지 않고 실패로 마킹(불완전 엔티티 방지)
+                log.error("[배지 반영 실패] 배지 없음 userId={}, categoryId={}, executionId={}",
+                        result.getUserId(), result.getCategoryId(), executionId);
+                result.setStatus(BatchResultStatus.FAILED);
+                badgeResultRepository.save(result);
+                continue;
             }
+
+            Badge badge = opt.get();
+            if (result.isNewState()) badge.activate(); else badge.deactivate();
             badgeRepository.save(badge);
 
-            // 처리 완료 상태로 변경
             result.setStatus(BatchResultStatus.APPLIED);
             badgeResultRepository.save(result);
         }
-        log.info("[배지 결과] {}건 반영 완료.", pendingBadges.size());
+        log.info("[배지 결과] 반영 완료. {}건 APPLIED", pendingBadges.size());
     }
 
-    /**
-     * 등급 계산 결과를 라이브 user 테이블에 반영합니다.
-     * 이 메서드는 독립적인 트랜잭션으로 실행됩니다.
-     */
-    @Transactional
-    public void applyLevelResults(UUID executionId) {
-        List<LevelResult> pendingLevels = levelResultRepository.findByExecutionIdAndStatus(executionId, BatchResultStatus.PENDING);
+    public void applyLevelResults(UUID executionId, long startUserId, long endUserId) {
+        List<LevelResult> pendingLevels =
+                levelResultRepository.findByExecutionIdAndStatusAndUserIdBetween(
+                        executionId, BatchResultStatus.PENDING, startUserId, endUserId);
+
         if (pendingLevels.isEmpty()) {
-            log.info("[등급 결과] 반영할 내용 없음. executionId={}", executionId);
+            log.info("[등급 결과] 반영할 내용 없음. executionId={}, range=[{}~{}]",
+                    executionId, startUserId, endUserId);
             return;
         }
 
-        log.info("[등급 결과] {}건 반영 시작...", pendingLevels.size());
-        for (LevelResult result : pendingLevels) {
-            User user = userRepository.findById(result.getUserId())
-                    .orElse(null);
+        log.info("[등급 결과] {}건 반영 시작... executionId={}, range=[{}~{}]",
+                pendingLevels.size(), executionId, startUserId, endUserId);
 
+        for (LevelResult result : pendingLevels) {
+            User user = userRepository.findById(result.getUserId()).orElse(null);
             if (user == null) {
-                log.error("[등급 반영 실패] 사용자를 찾을 수 없습니다. userId={}", result.getUserId());
+                log.error("[등급 반영 실패] 사용자 없음 userId={}, executionId={}", result.getUserId(), executionId);
                 result.setStatus(BatchResultStatus.FAILED);
                 levelResultRepository.save(result);
                 continue;
@@ -108,10 +100,9 @@ public class BatchResultApplier {
             user.setLastMembershipChange(LocalDateTime.now());
             userRepository.save(user);
 
-            // 처리 완료 상태로 변경
             result.setStatus(BatchResultStatus.APPLIED);
             levelResultRepository.save(result);
         }
-        log.info("[등급 결과] {}건 반영 완료.", pendingLevels.size());
+        log.info("[등급 결과] 반영 완료. {}건 APPLIED", pendingLevels.size());
     }
 }

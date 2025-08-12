@@ -16,4 +16,6 @@ public interface BadgeResultRepository extends JpaRepository<BadgeResult,Long> {
     @Transactional
     @Modifying
     void deleteByExecutionId(UUID executionId);
-}
+
+    List<BadgeResult> findByExecutionIdAndStatusAndUserIdBetween(
+            UUID executionId, BatchResultStatus status, long startUserId, long endUserId);}
