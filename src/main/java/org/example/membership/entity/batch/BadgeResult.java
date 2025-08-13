@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.example.membership.common.enums.BatchResultStatus;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -36,14 +37,18 @@ public class BadgeResult {
     @Column(nullable = false)
     private BatchResultStatus status = BatchResultStatus.PENDING;
 
+    @Column(name = "applied_at")
+    private LocalDateTime appliedAt;
+
     @Builder
     public BadgeResult(UUID executionId, Long userId, Long categoryId, boolean newState) {
         this.executionId = executionId;
         this.userId = userId;
         this.categoryId = categoryId;
         this.newState = newState;
+    }
 
-
-
+    public boolean isNewState() {
+        return newState;
     }
 }

@@ -36,7 +36,6 @@ public class BadgeController {
      */
     @PostMapping("/activate")
     public ResponseEntity<String> activate(@RequestBody BadgeActivationRequest request) {
-        // isMyUser와 같은 샤딩 로직은 API 게이트웨이나 서비스 메시 레벨에서 처리하는 것이 일반적이지만,
         // 여기서는 애플리케이션 레벨에 유지합니다.
         if (!myWasInstanceHolder.isMyUser(request.getUserId())) {
             // 이 요청을 처리할 올바른 WAS로 리다이렉트하거나, 클라이언트가 직접 올바른 노드로 요청하도록 유도할 수 있습니다.
@@ -45,7 +44,6 @@ public class BadgeController {
                     .body("This request should be handled by another WAS instance.");
         }
 
-        // 새로운 아키텍처에서는 배치 실행과 API가 분리되어 FlagManager를 통한 확인이 불필요해졌습니다.
         jpaBadgeService.changeBadgeActivation(
                 request.getUserId(),
                 request.getCategoryId(),
@@ -54,12 +52,5 @@ public class BadgeController {
         return ResponseEntity.ok("OK");
     }
 
-    /**
-     * [API용] 단일 배지 상태를 '오늘 기준 통계'로 즉시 업데이트합니다.
-     */
-    @PatchMapping("/manual-update")
-    public ResponseEntity<String> manualUpdate(@RequestBody ManualBadgeUpdateRequest request) {
-        jpaBadgeService.updateBadge(request.getUserId(), request.getCategoryId());
-        return ResponseEntity.ok("OK");
-    }
+
 }

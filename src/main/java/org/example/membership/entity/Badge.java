@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.example.membership.entity.batch.BadgeResult;
 
 
 import java.time.LocalDateTime;
@@ -46,4 +47,13 @@ public class Badge {
         this.active = false;
         this.updatedAt = LocalDateTime.now();
     }
+
+    public void applyFromResult(BadgeResult result) {
+        if (result.isNewState()) {
+            activate();
+        } else {
+            deactivate();
+        }
+    }
+
 }

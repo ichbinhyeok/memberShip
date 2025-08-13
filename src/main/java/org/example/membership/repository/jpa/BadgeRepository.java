@@ -50,5 +50,11 @@ public interface BadgeRepository extends JpaRepository<Badge, Long> {
     WHERE b.user.id BETWEEN :start AND :end
     """)
     List<String> findKeysByUserIdRange(@Param("start") Long start, @Param("end") Long end);
+
+
+    Optional<Badge> findByUserId(Long userId);
+
 }
+
+
 

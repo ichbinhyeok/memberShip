@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.example.membership.common.enums.MembershipLevel;
+import org.example.membership.entity.batch.LevelResult;
 
 import java.time.LocalDateTime;
 
@@ -38,6 +39,11 @@ public class User {
 
     public User(String name) {
         this.name = name;
+    }
+
+    public void applyLevelFromResult(LevelResult result) {
+        this.membershipLevel = result.getNewLevel();
+        this.lastMembershipChange = LocalDateTime.now();
     }
 
 } 

@@ -52,6 +52,20 @@ public class BatchExecutionLog {
     @UpdateTimestamp
     private LocalDateTime endedAt;
 
+    public static BatchExecutionLog create(UUID executionId,
+                                           LocalDate targetDate,
+                                           LocalDateTime cutoffAt,
+                                           BatchStatus status) {
+        return BatchExecutionLog.builder()
+                .executionId(executionId)
+                .targetDate(targetDate.toString())
+                .cutoffAt(cutoffAt)
+                .status(status)
+                .startedAt(LocalDateTime.now())
+                .build();
+    }
+
+
     // --- 상태 메서드 ---
     /** 스케일아웃으로 인한 중단 */
     public void markInterruptedByScaleOut() {

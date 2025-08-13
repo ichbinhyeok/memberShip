@@ -1,11 +1,7 @@
-// ReadPhaseService.java
 package org.example.membership.batch;
 
 import lombok.RequiredArgsConstructor;
-import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.User;
-import org.example.membership.repository.jpa.UserRepository;
-import org.example.membership.service.jpa.JpaBadgeService;
 import org.example.membership.service.jpa.JpaOrderService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,35 +15,22 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ReadPhaseService {
 
-    private final UserRepository userRepository;
+    private final org.example.membership.repository.jpa.UserRepository userRepository;
     private final JpaOrderService jpaOrderService;
-    private final JpaBadgeService jpaBadgeService;
 
+    /**
+     * 전체 사용자와 전체 기간 집계만 수행하여 CalcContext 생성
+     */
     @Transactional(readOnly = true)
-    public CalcContext buildContext(LocalDate targetDate,
-                                    LocalDateTime cutoffAt,
-                                    long minId, long maxId,
-                                    int index, int total,
-                                    int batchSize) {
-        long totalSpan = maxId - minId + 1;
-        long rangeSize = Math.max(1, (long) Math.ceil((double) totalSpan / total));
-        long rangeStart = minId + (long) index * rangeSize;
-        long rangeEnd   = (index == total - 1) ? maxId : Math.min(maxId, rangeStart + rangeSize - 1);
+    public CalcContext buildContext(LocalDate targetDate, LocalDateTime cutoffAt, int batchSize) {
+        // 전량 사용자 조회
+        List<User> allUsers = userRepository.findAll();
 
-        if (rangeStart > maxId) {
-            return CalcContext.empty(rangeStart, rangeEnd, index, total);
-        }
+        // 전량 집계: targetDate ~ cutoffAt 구간
+        Map<String, Boolean> keysToUpdate =
+                jpaOrderService.aggregateUserCategoryStats(targetDate, cutoffAt);
 
-        // 1) 범위 제한 집계
-        Map<Long, Map<Long, OrderCountAndAmount>> statMap =
-                jpaOrderService.aggregateUserCategoryStats(targetDate, cutoffAt, rangeStart, rangeEnd);
-
-        // 2) 범위 유저 조회
-        List<User> myUsers = userRepository.findUsersInRange(rangeStart, rangeEnd);
-
-        // 3) 배지 대상 선별(읽기 연산)
-        Map<String, Boolean> keysToUpdate = jpaBadgeService.detectBadgeUpdateTargets(myUsers, statMap);
-
-        return CalcContext.of(rangeStart, rangeEnd, index, total, myUsers, statMap, keysToUpdate, batchSize);
+        boolean empty = allUsers.isEmpty();
+        return new CalcContext(allUsers, keysToUpdate, batchSize, empty);
     }
 }

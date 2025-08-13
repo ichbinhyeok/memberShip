@@ -125,36 +125,21 @@ public class JpaOrderService {
         }).toList();
     }
 
-    /**
-     * 지정된 날짜(targetDate) 기준 최근 3개월 동안,
-     * 컷오프 시점(cutoffAt) 이전에 발생한 주문 통계를 집계합니다.
-     *
-     * @param targetDate 통계의 기준이 되는 날짜 (예: 2025-06-01)
-     * @param cutoffAt   데이터 집계의 상한선이 되는 정확한 시간 (T0)
-     * @param startUserId 현재 was에 필요한 범위만큼만
-     * @param endUserId
-     * @return 사용자별, 카테고리별 주문 횟수 및 금액 맵
-     */
     @Transactional(readOnly = true)
-    public Map<Long, Map<Long, OrderCountAndAmount>> aggregateUserCategoryStats(
-            LocalDate targetDate,
-            LocalDateTime cutoffAt,
-            long startUserId,
-            long endUserId
-    ) {
-        LocalDateTime startDateTime = targetDate.withDayOfMonth(1).minusMonths(3).atStartOfDay();
-        List<Object[]> rows = orderRepository.aggregateByUserAndCategoryBetween(startDateTime, cutoffAt, startUserId, endUserId);
+    public Map<String, Boolean> aggregateUserCategoryStats(LocalDate targetDate, LocalDateTime cutoffAt) {
+        LocalDateTime startDateTime = targetDate.atStartOfDay();
+        LocalDateTime endDateTime = cutoffAt;
 
-        Map<Long, Map<Long, OrderCountAndAmount>> statMap = new HashMap<>();
-        for (Object[] r : rows) {
-            Long userId = (Long) r[0];
-            Long categoryId = (Long) r[1];
-            Long cnt = ((Number) r[2]).longValue();
-            BigDecimal amt = (BigDecimal) r[3];
-            statMap.computeIfAbsent(userId, k -> new HashMap<>())
-                    .put(categoryId, new OrderCountAndAmount(cnt, amt));
+        List<Object[]> results = orderRepository.aggregateUserCategoryStats(startDateTime, endDateTime);
+        Map<String, Boolean> keysToUpdate = new HashMap<>();
+
+        for (Object[] row : results) {
+            Long userId = ((Number) row[0]).longValue();
+            Boolean hasActivity = ((Number) row[1]).longValue() > 0;
+            keysToUpdate.put(userId + ":badge", hasActivity); // 예시 key
         }
-        return statMap;
+
+        return keysToUpdate;
     }
 
 

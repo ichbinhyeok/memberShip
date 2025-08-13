@@ -1,21 +1,16 @@
-// SnapshotBatchOrchestrator.java
 package org.example.membership.batch;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.membership.config.MyWasInstanceHolder;
-import org.example.membership.entity.WasInstance;
 import org.example.membership.entity.batch.BatchExecutionLog;
-import org.example.membership.exception.ScaleOutInterruptedException;
-import org.example.membership.repository.jpa.UserRepository;
-import org.example.membership.repository.jpa.WasInstanceRepository;
-import org.example.membership.repository.jpa.batch.BadgeResultRepository;
+import org.example.membership.entity.batch.BatchExecutionLog.BatchStatus;
 import org.example.membership.repository.jpa.batch.BatchExecutionLogRepository;
-import org.example.membership.repository.jpa.batch.LevelResultRepository;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -23,145 +18,82 @@ import java.util.UUID;
 @Slf4j
 public class SnapshotBatchOrchestrator {
 
-    private static final int HEARTBEAT_TIMEOUT_SECONDS = 30;
+    private final BatchExecutionLogRepository batchRepo;
+    private final ReadPhaseService readPhaseService;
+    private final WritePhaseService writePhaseService;
 
-    private final MyWasInstanceHolder myWasInstanceHolder;
-    private final WasInstanceRepository wasInstanceRepository;
-    private final BatchExecutionLogRepository batchExecutionLogRepository;
-    private final UserRepository userRepository;
-
-    private final BadgeResultRepository badgeResultRepository;
-    private final LevelResultRepository levelResultRepository;
-
-    private final ReadPhaseService readPhaseService;   // @Transactional(readOnly = true)
-    private final WritePhaseService writePhaseService; // 쓰기/병렬 청크
-    private final ScaleOutGuard scaleOutGuard;         // (1) init 호출 추가
-
-    public void runFullBatch(String targetDateStr, int batchSize) {
-        LocalDateTime threshold = LocalDateTime.now().minusSeconds(HEARTBEAT_TIMEOUT_SECONDS);
-
-        long aliveCount = batchExecutionLogRepository.countAliveActiveForTargetDate(
-                targetDateStr,
-                BatchExecutionLog.BatchStatus.RUNNING,
-                BatchExecutionLog.BatchStatus.RESTORING,
-                threshold
-        );
-        if (aliveCount > 0) {
-            log.warn("[보류] targetDate={} 살아있는 활성 배치 존재", targetDateStr);
+    @Transactional
+    public void runFullBatch(LocalDate targetDate, int batchSize) {
+        // (a) 활성 실행 차단
+        LocalDateTime nowMinus30s = LocalDateTime.now().minusSeconds(30);
+        if (batchRepo.countAliveActiveForTargetDate(
+                targetDate.toString(),
+                List.of(BatchStatus.RUNNING, BatchStatus.RESTORING),
+                nowMinus30s) > 0) {
+            log.warn("Active batch already running for {}", targetDate);
             return;
         }
 
-        WasInstance was = wasInstanceRepository.findById(myWasInstanceHolder.getMyUuid())
-                .orElseThrow(() -> new IllegalStateException("WAS 인스턴스 정보 없음"));
 
-        final UUID executionId = UUID.randomUUID();
-        final LocalDate targetDate = LocalDate.parse(targetDateStr);
-        final LocalDateTime cutoffAt = targetDate.atStartOfDay(); // T0
-        final int index = myWasInstanceHolder.getMyIndex();
-        final int total = myWasInstanceHolder.getTotalWases();
-
-        BatchExecutionLog batchLog = batchExecutionLogRepository.save(
-                BatchExecutionLog.builder()
-                        .executionId(executionId)
-                        .wasInstance(was)
-                        .targetDate(targetDateStr)
-                        .cutoffAt(cutoffAt)
-                        .status(BatchExecutionLog.BatchStatus.RUNNING)
-                        .interruptedByScaleOut(false)
-                        .build()
-        );
-
-        log.info("[신규 배치 시작] executionId={}, targetDate={}, T0={}, index={}, total={}",
-                executionId, targetDate, cutoffAt, index, total);
+        // (b) RUNNING 생성
+        LocalDateTime cutoffAt = targetDate.atStartOfDay();
+        BatchExecutionLog logEntity = BatchExecutionLog.create(UUID.randomUUID(), targetDate, cutoffAt, BatchStatus.RUNNING);
+        batchRepo.save(logEntity);
 
         try {
-            long minId = userRepository.findMinUserId();
-            long maxId = userRepository.findMaxUserId();
+            // (c) 컨텍스트 생성
+            CalcContext ctx = readPhaseService.buildContext(targetDate, cutoffAt, batchSize);
 
-            // 읽기 페이즈: 경계 계산/집계/대상 선별
-            CalcContext ctx = readPhaseService.buildContext(
-                    targetDate, cutoffAt, minId, maxId, index, total, batchSize
-            );
-
+            // (d) 빈 컨텍스트 처리
             if (ctx.empty()) {
-                log.info("담당 범위 없음. 완료 처리합니다.");
-                batchLog.markCompleted();
-                batchExecutionLogRepository.save(batchLog);
+                logEntity.markCompleted();
+                batchRepo.save(logEntity);
                 return;
             }
 
-            // (1) 쓰기 시작 직전에 가드 초기화
-            scaleOutGuard.init(total);
+            // (e) 저장 및 반영
+            writePhaseService.persistAndApply(logEntity.getExecutionId(), ctx);
 
-            // 쓰기 페이즈: 저장/반영/쿠폰
-            writePhaseService.persistAndApply(executionId, ctx);
-            writePhaseService.applyCoupon(executionId, ctx);
+            // (f) 쿠폰
+            writePhaseService.applyCoupon(logEntity.getExecutionId(), ctx);
 
-            batchLog.markCompleted();
-            batchExecutionLogRepository.save(batchLog);
-            log.info("[신규 배치 완료] executionId={}", executionId);
+            // (g) 완료
+            logEntity.markCompleted();
+            batchRepo.save(logEntity);
 
-        } catch (ScaleOutInterruptedException e) {
-            log.warn("[배치 중단] 스케일아웃 감지. executionId={}, msg={}", executionId, e.getMessage());
-            batchLog.markInterruptedByScaleOut();
-            batchExecutionLogRepository.save(batchLog);
         } catch (Exception e) {
-            log.error("[배치 실패] executionId={}", executionId, e);
-            batchLog.markFailed();
-            batchExecutionLogRepository.save(batchLog);
-            throw new RuntimeException(e);
+            logEntity.markFailed();
+            batchRepo.save(logEntity);
+            throw e;
         }
     }
 
-    public void restoreInterruptedBatch(BatchExecutionLog batchLog) {
-        final UUID executionId = batchLog.getExecutionId();
-        final LocalDateTime cutoffAt = batchLog.getCutoffAt();
-        final LocalDate targetDate = LocalDate.parse(batchLog.getTargetDate());
-        final int batchSize = 1000;
-        final int index = myWasInstanceHolder.getMyIndex();
-        final int total = myWasInstanceHolder.getTotalWases();
+    @Transactional
+    public void restoreInterruptedBatch(UUID executionId, LocalDate targetDate, int batchSize) {
+        BatchExecutionLog logEntity = batchRepo.findByExecutionId(executionId)
+                .orElseThrow(() -> new IllegalArgumentException("BatchExecutionLog not found: " + executionId));
 
-        log.info("[배치 복원 시작] executionId={}, targetDate={}, T0={}, index={}, total={}",
-                executionId, targetDate, cutoffAt, index, total);
+        logEntity.markRestoring();
+        batchRepo.save(logEntity);
 
         try {
-            // (4) 복원 상태 전이
-            batchLog.markRestoring();
-            batchExecutionLogRepository.save(batchLog);
+            // 기존 산출물 삭제
+            writePhaseService.clearResults(executionId);
 
-            // 이전 계산 결과 초기화
-            badgeResultRepository.deleteByExecutionId(executionId);
-            levelResultRepository.deleteByExecutionId(executionId);
+            // 동일 컨텍스트 생성
+            LocalDateTime cutoffAt = targetDate.atStartOfDay();
+            CalcContext ctx = readPhaseService.buildContext(targetDate, cutoffAt, batchSize);
 
-            long minId = userRepository.findMinUserId();
-            long maxId = userRepository.findMaxUserId();
-
-            CalcContext ctx = readPhaseService.buildContext(
-                    targetDate, cutoffAt, minId, maxId, index, total, batchSize
-            );
-
-            if (ctx.empty()) {
-                log.info("담당 범위 없음. 복원 스킵");
-                batchLog.markCompleted();
-                batchExecutionLogRepository.save(batchLog);
-                return;
-            }
-
-            // (1) 쓰기 시작 직전에 가드 초기화
-            scaleOutGuard.init(total);
-
+            // 저장 및 반영
             writePhaseService.persistAndApply(executionId, ctx);
             writePhaseService.applyCoupon(executionId, ctx);
 
-            batchLog.markCompleted();
-            batchExecutionLogRepository.save(batchLog);
-            log.info("[배치 복원 완료] executionId={}", executionId);
-
+            logEntity.markCompleted();
+            batchRepo.save(logEntity);
         } catch (Exception e) {
-            log.error("[배치 복원 실패] executionId={}", executionId, e);
-            batchLog.markFailed();
-            batchExecutionLogRepository.save(batchLog);
-            throw new RuntimeException(e);
+            logEntity.markFailed();
+            batchRepo.save(logEntity);
+            throw e;
         }
     }
 }

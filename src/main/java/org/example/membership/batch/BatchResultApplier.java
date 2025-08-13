@@ -28,81 +28,76 @@ public class BatchResultApplier {
     private final BadgeRepository badgeRepository;
     private final UserRepository userRepository;
 
+    /**
+     * 지정 executionId의 배지/레벨 결과를 DB에 반영한다.
+     */
     @Transactional
-    public void applyResults(UUID executionId, long startUserId, long endUserId) {
-        log.info("[결과 반영 시작] executionId={}, range=[{}~{}]", executionId, startUserId, endUserId);
-        applyBadgeResults(executionId, startUserId, endUserId);
-        applyLevelResults(executionId, startUserId, endUserId);
-        log.info("[결과 반영 완료] executionId={}", executionId);
+    public void applyResults(UUID executionId) {
+        applyBadgeResults(executionId);
+        applyLevelResults(executionId);
     }
 
+    /**
+     * 배지 반영 로직
+     */
+    private void applyBadgeResults(UUID executionId) {
+        List<BadgeResult> badgeResults =
+                badgeResultRepository.findByExecutionIdAndStatus(executionId, BatchResultStatus.PENDING);
 
-    public void applyBadgeResults(UUID executionId, long startUserId, long endUserId) {
-        List<BadgeResult> pendingBadges =
-                badgeResultRepository.findByExecutionIdAndStatusAndUserIdBetween(
-                        executionId, BatchResultStatus.PENDING, startUserId, endUserId);
+        for (BadgeResult result : badgeResults) {
+            try {
 
-        if (pendingBadges.isEmpty()) {
-            log.info("[배지 결과] 반영할 내용 없음. executionId={}, range=[{}~{}]",
-                    executionId, startUserId, endUserId);
-            return;
-        }
+                Badge badge = badgeRepository.findByUserId(result.getUserId())
+                        .orElseThrow(() -> new IllegalStateException("Badge not found for userId=" + result.getUserId()));
 
-        log.info("[배지 결과] {}건 반영 시작 executionId={}, range=[{}~{}]",
-                pendingBadges.size(), executionId, startUserId, endUserId);
 
-        for (BadgeResult result : pendingBadges) {
-            // 배지 엔티티 조회
-            var opt = badgeRepository.findByUserIdAndCategoryId(result.getUserId(), result.getCategoryId());
-            if (opt.isEmpty()) {
-                // 지금은 생성하지 않고 실패로 마킹(불완전 엔티티 방지)
-                log.error("[배지 반영 실패] 배지 없음 userId={}, categoryId={}, executionId={}",
-                        result.getUserId(), result.getCategoryId(), executionId);
+
+                // 배치 산출물 기반 반영
+                badge.applyFromResult(result);
+
+                badgeRepository.save(badge);
+
+                // 결과 상태 업데이트
+                result.setStatus(BatchResultStatus.APPLIED);
+                result.setAppliedAt(LocalDateTime.now());
+
+            } catch (Exception e) {
                 result.setStatus(BatchResultStatus.FAILED);
-                badgeResultRepository.save(result);
-                continue;
+                log.error("배지 반영 실패 userId={}", result.getUserId(), e);
             }
-
-            Badge badge = opt.get();
-            if (result.isNewState()) badge.activate(); else badge.deactivate();
-            badgeRepository.save(badge);
-
-            result.setStatus(BatchResultStatus.APPLIED);
-            badgeResultRepository.save(result);
         }
-        log.info("[배지 결과] 반영 완료. {}건 APPLIED", pendingBadges.size());
+
+        badgeResultRepository.saveAll(badgeResults);
     }
 
-    public void applyLevelResults(UUID executionId, long startUserId, long endUserId) {
-        List<LevelResult> pendingLevels =
-                levelResultRepository.findByExecutionIdAndStatusAndUserIdBetween(
-                        executionId, BatchResultStatus.PENDING, startUserId, endUserId);
+    /**
+     * 레벨 반영 로직
+     */
+    private void applyLevelResults(UUID executionId) {
+        List<LevelResult> levelResults =
+                levelResultRepository.findByExecutionIdAndStatus(executionId, BatchResultStatus.PENDING);
 
-        if (pendingLevels.isEmpty()) {
-            log.info("[등급 결과] 반영할 내용 없음. executionId={}, range=[{}~{}]",
-                    executionId, startUserId, endUserId);
-            return;
-        }
+        for (LevelResult result : levelResults) {
+            try {
+                // 유저 조회
+                User user = userRepository.findById(result.getUserId())
+                        .orElseThrow(() -> new IllegalStateException("User not found: " + result.getUserId()));
 
-        log.info("[등급 결과] {}건 반영 시작... executionId={}, range=[{}~{}]",
-                pendingLevels.size(), executionId, startUserId, endUserId);
+                // 배치 산출물 기반 레벨 반영
+                user.applyLevelFromResult(result);
 
-        for (LevelResult result : pendingLevels) {
-            User user = userRepository.findById(result.getUserId()).orElse(null);
-            if (user == null) {
-                log.error("[등급 반영 실패] 사용자 없음 userId={}, executionId={}", result.getUserId(), executionId);
+                userRepository.save(user);
+
+                // 결과 상태 업데이트
+                result.setStatus(BatchResultStatus.APPLIED);
+                result.setAppliedAt(LocalDateTime.now());
+
+            } catch (Exception e) {
                 result.setStatus(BatchResultStatus.FAILED);
-                levelResultRepository.save(result);
-                continue;
+                log.error("레벨 반영 실패 userId={}", result.getUserId(), e);
             }
-
-            user.setMembershipLevel(result.getNewLevel());
-            user.setLastMembershipChange(LocalDateTime.now());
-            userRepository.save(user);
-
-            result.setStatus(BatchResultStatus.APPLIED);
-            levelResultRepository.save(result);
         }
-        log.info("[등급 결과] 반영 완료. {}건 APPLIED", pendingLevels.size());
+
+        levelResultRepository.saveAll(levelResults);
     }
 }

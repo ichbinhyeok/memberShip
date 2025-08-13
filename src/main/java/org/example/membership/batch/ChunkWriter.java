@@ -1,4 +1,3 @@
-// ChunkWriter.java
 package org.example.membership.batch;
 
 import lombok.RequiredArgsConstructor;
@@ -19,13 +18,12 @@ public class ChunkWriter {
     private final BadgeResultCalculator badgeResultCalculator;
     private final LevelResultCalculator levelResultCalculator;
     private final BatchResultApplier batchResultApplier;
-    private final CouponBatchExecutor couponBatchExecutor; // (2) 주입
+    private final CouponBatchExecutor couponBatchExecutor;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void writeBadgeAndLevelChunk(UUID executionId,
                                         List<Long> userIdChunk,
-                                        CalcContext ctx,
-                                        ScaleOutGuard guard) {
+                                        CalcContext ctx) {
         if (userIdChunk.isEmpty()) return;
 
         Set<Long> allow = new HashSet<>(userIdChunk);
@@ -38,28 +36,26 @@ public class ChunkWriter {
             String k = e.getKey();
             int idx = k.indexOf(':');
             long uid = Long.parseLong(k.substring(0, idx));
-            if (allow.contains(uid)) subKeys.put(k, e.getValue());
+            if (allow.contains(uid)) {
+                subKeys.put(k, e.getValue());
+            }
         }
 
+        // 배지 결과 저장
         badgeResultCalculator.calculateAndStoreResults(executionId, subKeys, ctx.batchSize());
-        levelResultCalculator.calculateAndStoreResults(executionId, users, ctx.batchSize());
 
-        guard.ensureUnchanged();
+        // 레벨 결과 저장
+        levelResultCalculator.calculateAndStoreResults(executionId, users, ctx.batchSize());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void applyResultsRange(UUID executionId,
-                                  long startUserId,
-                                  long endUserId,
-                                  ScaleOutGuard guard) {
-        batchResultApplier.applyResults(executionId, startUserId, endUserId);
-        guard.ensureUnchanged();
+    public void applyResultsAll(UUID executionId) {
+        batchResultApplier.applyResults(executionId);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void applyCoupon(UUID executionId, CalcContext ctx) {
         if (ctx.empty()) return;
-        // (2) 쿠폰 지급 실행
         couponBatchExecutor.execute(ctx.myUsers(), ctx.batchSize(), executionId);
     }
 }

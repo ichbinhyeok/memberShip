@@ -8,8 +8,11 @@ import org.springframework.data.repository.query.Param;
 import org.example.membership.entity.batch.BatchExecutionLog.BatchStatus;
 
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 public interface BatchExecutionLogRepository extends JpaRepository<BatchExecutionLog,Long> {
 
@@ -44,19 +47,32 @@ public interface BatchExecutionLogRepository extends JpaRepository<BatchExecutio
     """)
     int updateStatusToRestoring(@Param("id") Long id, @Param("now") LocalDateTime now);
 
+//      스냅샷 구조로 리팩토링 레거시 : 0812
+//    @Query("""
+//    select count(b)
+//    from BatchExecutionLog b
+//    join b.wasInstance wi
+//    where b.targetDate = :targetDate
+//      and b.status in (:s1, :s2)
+//      and wi.lastHeartbeatAt >= :threshold
+//""")
+//    long countAliveActiveForTargetDate(@Param("targetDate") String targetDate,
+//                                       @Param("s1") BatchStatus s1,
+//                                       @Param("s2") BatchStatus s2,
+//                                       @Param("threshold") LocalDateTime threshold);
+//
 
     @Query("""
-    select count(b) 
-    from BatchExecutionLog b
-    join b.wasInstance wi
-    where b.targetDate = :targetDate
-      and b.status in (:s1, :s2)
-      and wi.lastHeartbeatAt >= :threshold
+    SELECT COUNT(b)
+    FROM BatchExecutionLog b
+    WHERE b.targetDate = :targetDate
+      AND b.status IN :statuses
+      AND b.startedAt > :threshold
 """)
     long countAliveActiveForTargetDate(@Param("targetDate") String targetDate,
-                                       @Param("s1") BatchStatus s1,
-                                       @Param("s2") BatchStatus s2,
+                                       @Param("statuses") List<BatchStatus> statuses,
                                        @Param("threshold") LocalDateTime threshold);
+
 
 
     @Query("""
@@ -95,6 +111,9 @@ public interface BatchExecutionLogRepository extends JpaRepository<BatchExecutio
 
 
     List<BatchExecutionLog> findByStatus(BatchStatus status);
+
+
+    Optional<BatchExecutionLog> findByExecutionId(UUID executionId);
 
 }
 

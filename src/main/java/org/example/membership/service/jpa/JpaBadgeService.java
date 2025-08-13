@@ -58,50 +58,13 @@ public class JpaBadgeService {
         return targets;
     }
 
-    /**
-     * [API용] 단일 배지 상태를 '오늘 기준 통계'로 즉시 업데이트합니다.
-     */
-    @Transactional
-    public Badge updateBadge(Long userId, Long categoryId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found"));
-        Category category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new NotFoundException("Category not found"));
-        Badge badge = badgeRepository.findByUserAndCategory(user, category)
-                .orElseThrow(() -> new NotFoundException("Badge not found"));
-
-        // 오늘 기준 3개월 창 + 지금 시각을 컷오프로, 사용자 한 명 범위로만 집계
-        Map<Long, Map<Long, OrderCountAndAmount>> statMap =
-                jpaOrderService.aggregateUserCategoryStats(
-                        LocalDate.now(),
-                        LocalDateTime.now(),
-                        userId,     // startUserId
-                        userId      // endUserId
-                );
-
-        Map<Long, OrderCountAndAmount> userStats =
-                statMap.getOrDefault(userId, Collections.emptyMap());
-        OrderCountAndAmount stat = userStats.get(categoryId);
-
-        boolean shouldBeActive = stat != null
-                && stat.getCount() >= 5
-                && stat.getAmount().compareTo(new BigDecimal("400000")) >= 0;
-
-        if (badge.isActive() != shouldBeActive) {
-            if (shouldBeActive) badge.activate(); else badge.deactivate();
-        }
-        return badgeRepository.save(badge);
-    }
 
     /**
      * [API용] 관리자가 배지 활성 상태를 수동으로 변경합니다.
      */
     @Transactional
     public Badge changeBadgeActivation(Long userId, Long categoryId, boolean active) {
-        //  단순화: 더 이상 배치 실행 여부를 확인할 필요가 없습니다.
-        // if (flagManager.isBadgeBatchRunning() || flagManager.isBadgeFlagged(userId, categoryId)) {
-        //     throw new IllegalStateException("현재 해당 배지는 배치 처리 중입니다. 잠시 후 다시 시도해주세요.");
-        // }
+
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));

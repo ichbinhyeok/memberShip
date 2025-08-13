@@ -1,15 +1,20 @@
-// WritePhaseService.java
 package org.example.membership.batch;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.membership.entity.User;
+import org.example.membership.repository.jpa.batch.BadgeResultRepository;
+import org.example.membership.repository.jpa.batch.LevelResultRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -17,11 +22,12 @@ import java.util.concurrent.*;
 public class WritePhaseService {
 
     private final ChunkWriter chunkWriter;
-    private final ScaleOutGuard scaleOutGuard;
+    private final BadgeResultRepository badgeResultRepository;
+    private final LevelResultRepository levelResultRepository;
 
     public void persistAndApply(UUID executionId, CalcContext ctx) {
         if (ctx.empty()) {
-            log.info("담당 범위 없음. 쓰기 페이즈 스킵");
+            log.info("쓰기 페이즈: 처리할 사용자 없음");
             return;
         }
 
@@ -32,28 +38,24 @@ public class WritePhaseService {
         });
 
         try {
-            // 사용자 ID → 청크(500 고정)
             List<Long> userIds = ctx.myUsers().stream().map(User::getId).toList();
-            List<List<Long>> chunks = sliceFixed(userIds, 500);
-
             List<Future<?>> futures = new ArrayList<>();
-            for (List<Long> chunk : chunks) {
-                futures.add(executor.submit(() -> {
-                    chunkWriter.writeBadgeAndLevelChunk(executionId, chunk, ctx, scaleOutGuard);
-                    return null;
-                }));
+
+            for (int i = 0; i < userIds.size(); i += 500) {
+                List<Long> chunk = userIds.subList(i, Math.min(i + 500, userIds.size()));
+                futures.add(executor.submit(() ->
+                        chunkWriter.writeBadgeAndLevelChunk(executionId, chunk, ctx)));
             }
 
             for (Future<?> f : futures) {
-                f.get();
+                f.get(); // 완료 대기
             }
 
-            // 반영은 범위 단위(필요 시 여기도 청크화 가능)
-            chunkWriter.applyResultsRange(executionId, ctx.rangeStart(), ctx.rangeEnd(), scaleOutGuard);
+            chunkWriter.applyResultsAll(executionId);
 
         } catch (Exception e) {
             executor.shutdownNow();
-            throw new RuntimeException(e);
+            throw new RuntimeException("쓰기 페이즈 실패", e);
         } finally {
             executor.shutdown();
             try {
@@ -68,15 +70,13 @@ public class WritePhaseService {
     }
 
     public void applyCoupon(UUID executionId, CalcContext ctx) {
-        if (ctx.empty()) return;
-        chunkWriter.applyCoupon(executionId, ctx); // (2) 실제 지급 수행
+        chunkWriter.applyCoupon(executionId, ctx);
     }
 
-    private static <T> List<List<T>> sliceFixed(List<T> list, int size) {
-        List<List<T>> out = new ArrayList<>();
-        for (int i = 0; i < list.size(); i += size) {
-            out.add(list.subList(i, Math.min(i + size, list.size())));
-        }
-        return out;
+    @Transactional
+    public void clearResults(UUID executionId) {
+        log.info("Clearing results for executionId={}", executionId);
+        badgeResultRepository.deleteByExecutionId(executionId);
+        levelResultRepository.deleteByExecutionId(executionId);
     }
 }
