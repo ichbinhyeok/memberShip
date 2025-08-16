@@ -19,7 +19,7 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class WasInstanceRegistrar implements ApplicationRunner {
+    public class WasInstanceRegistrar implements ApplicationRunner {
 
     private final WasInstanceRepository wasInstanceRepository;
     private final MyWasInstanceHolder myWasInstanceHolder;

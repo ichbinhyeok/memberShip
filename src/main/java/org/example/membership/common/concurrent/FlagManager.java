@@ -45,9 +45,9 @@ public class FlagManager {
 
 
     public boolean isBadgeBatchRunning() {
-        // 전역 게이트가 켜졌거나(클러스터 차단), 현재 프로세스에서 오케스트레이터가 실행 중이면 true
-        return isGlobalApiGateOn() || isOrchestratorRunning();
+        return isBadgeFlagged(-1L, -1L);
     }
+
 
     // 재시작 시 휘발성만 정리
     public void clearTransientFlags() {

@@ -1,3 +1,4 @@
+// org/example/membership/batch/SnapshotBatchOrchestrator.java
 package org.example.membership.batch;
 
 import lombok.RequiredArgsConstructor;
@@ -10,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -22,78 +22,43 @@ public class SnapshotBatchOrchestrator {
     private final ReadPhaseService readPhaseService;
     private final WritePhaseService writePhaseService;
 
+    /**
+     * 선점 성공하여 실제 배치를 수행하면 true, 선점 실패면 false.
+     * 예외가 발생해도 선점은 성공한 것이므로 true를 반환(스케줄러가 플래그 해제 브로드캐스트).
+     */
     @Transactional
-    public void runFullBatch(LocalDate targetDate, int batchSize) {
-        // (a) 활성 실행 차단
-        LocalDateTime nowMinus30s = LocalDateTime.now().minusSeconds(30);
-        if (batchRepo.countAliveActiveForTargetDate(
-                targetDate.toString(),
-                List.of(BatchStatus.RUNNING, BatchStatus.RESTORING),
-                nowMinus30s) > 0) {
-            log.warn("Active batch already running for {}", targetDate);
-            return;
+    public boolean runFullBatch(LocalDate targetDate, int batchSize) {
+        UUID executionId = UUID.randomUUID();
+        LocalDateTime cutoffAt = targetDate.atStartOfDay();
+
+        int inserted = batchRepo.insertIfNotRunning(executionId, targetDate.toString(), cutoffAt);
+        if (inserted == 0) {
+            return false; // 다른 WAS가 실행 중
         }
 
-
-        // (b) RUNNING 생성
-        LocalDateTime cutoffAt = targetDate.atStartOfDay();
-        BatchExecutionLog logEntity = BatchExecutionLog.create(UUID.randomUUID(), targetDate, cutoffAt, BatchStatus.RUNNING);
-        batchRepo.save(logEntity);
+        BatchExecutionLog logEntity = batchRepo.findByExecutionId(executionId)
+                .orElseThrow(() -> new IllegalStateException("Execution record not found after insert"));
 
         try {
-            // (c) 컨텍스트 생성
-            CalcContext ctx = readPhaseService.buildContext(targetDate, cutoffAt, batchSize);
-
-            // (d) 빈 컨텍스트 처리
+            var ctx = readPhaseService.buildContext(targetDate, cutoffAt, batchSize);
             if (ctx.empty()) {
                 logEntity.markCompleted();
                 batchRepo.save(logEntity);
-                return;
+                return true;
             }
 
-            // (e) 저장 및 반영
             writePhaseService.persistAndApply(logEntity.getExecutionId(), ctx);
-
-            // (f) 쿠폰
             writePhaseService.applyCoupon(logEntity.getExecutionId(), ctx);
 
-            // (g) 완료
             logEntity.markCompleted();
             batchRepo.save(logEntity);
+            return true;
 
         } catch (Exception e) {
             logEntity.markFailed();
             batchRepo.save(logEntity);
-            throw e;
-        }
-    }
-
-    @Transactional
-    public void restoreInterruptedBatch(UUID executionId, LocalDate targetDate, int batchSize) {
-        BatchExecutionLog logEntity = batchRepo.findByExecutionId(executionId)
-                .orElseThrow(() -> new IllegalArgumentException("BatchExecutionLog not found: " + executionId));
-
-        logEntity.markRestoring();
-        batchRepo.save(logEntity);
-
-        try {
-            // 기존 산출물 삭제
-            writePhaseService.clearResults(executionId);
-
-            // 동일 컨텍스트 생성
-            LocalDateTime cutoffAt = targetDate.atStartOfDay();
-            CalcContext ctx = readPhaseService.buildContext(targetDate, cutoffAt, batchSize);
-
-            // 저장 및 반영
-            writePhaseService.persistAndApply(executionId, ctx);
-            writePhaseService.applyCoupon(executionId, ctx);
-
-            logEntity.markCompleted();
-            batchRepo.save(logEntity);
-        } catch (Exception e) {
-            logEntity.markFailed();
-            batchRepo.save(logEntity);
-            throw e;
+            log.error("[배지 배치] 실패 executionId={}", executionId, e);
+            return true;
         }
     }
 }

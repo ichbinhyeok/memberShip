@@ -115,6 +115,18 @@ public interface BatchExecutionLogRepository extends JpaRepository<BatchExecutio
 
     Optional<BatchExecutionLog> findByExecutionId(UUID executionId);
 
+
+    @Modifying
+    @Query(value = """
+        INSERT INTO batch_execution_log (execution_id, target_date, cutoff_at, status, started_at)
+        SELECT :executionId, :targetDate, :cutoffAt, 'RUNNING', NOW()
+        WHERE NOT EXISTS (
+            SELECT 1 FROM batch_execution_log WHERE status = 'RUNNING'
+        )
+        """, nativeQuery = true)
+    int insertIfNotRunning(@Param("executionId") UUID executionId,
+                           @Param("targetDate") String targetDate,
+                           @Param("cutoffAt") LocalDateTime cutoffAt);
 }
 
 
