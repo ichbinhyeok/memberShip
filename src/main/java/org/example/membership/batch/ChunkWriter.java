@@ -34,13 +34,11 @@ public class ChunkWriter {
     }
 
     // 3. 배지 결과만 적용
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void applyBadgeResultsAll(UUID executionId, LocalDateTime batchStartTime) {
         batchResultApplier.applyBadgeResults(executionId, batchStartTime);
     }
 
     //  4. 레벨 결과만 적용
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void applyLevelResultsAll(UUID executionId, LocalDateTime batchStartTime) {
         batchResultApplier.applyLevelResults(executionId, batchStartTime);
     }

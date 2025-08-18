@@ -4,17 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.membership.common.enums.BatchResultStatus;
 import org.example.membership.entity.Badge;
-import org.example.membership.entity.MembershipLog;
 import org.example.membership.entity.User;
 import org.example.membership.entity.batch.BadgeResult;
 import org.example.membership.entity.batch.LevelResult;
 import org.example.membership.repository.jpa.BadgeRepository;
-import org.example.membership.repository.jpa.MembershipLogRepository;
 import org.example.membership.repository.jpa.UserRepository;
 import org.example.membership.repository.jpa.batch.BadgeResultRepository;
 import org.example.membership.repository.jpa.batch.LevelResultRepository;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -33,132 +30,89 @@ public class BatchResultApplier {
     private final UserRepository userRepository;
     private final BadgeResultRepository badgeResultRepository;
     private final LevelResultRepository levelResultRepository;
-    private final MembershipLogRepository membershipLogRepository;
 
-    @Transactional
+    // ✨ 새로 만든 트랜잭션 처리 클래스를 주입받습니다.
+    private final TransactionalChunkProcessor chunkProcessor;
+
+    // ✨ 메소드 레벨의 @Transactional은 제거합니다.
     public void applyResults(UUID executionId, LocalDateTime batchStartTime) {
         log.info("[배치 결과 일괄 적용 시작] executionId={}", executionId);
-        long start = System.currentTimeMillis();
-
         applyBadgeResults(executionId, batchStartTime);
         applyLevelResults(executionId, batchStartTime);
-
-        long duration = System.currentTimeMillis() - start;
-        log.info("[배치 결과 일괄 적용 완료] executionId={}, 소요 시간: {}ms", executionId, duration);
+        log.info("[배치 결과 일괄 적용 완료] executionId={}", executionId);
     }
 
-    /**
-     */
     public void applyBadgeResults(UUID executionId, LocalDateTime batchStartTime) {
         log.info("[배지 결과 적용 시작] executionId={}", executionId);
-        long start = System.currentTimeMillis();
+        final int CHUNK_SIZE = 1000;
 
-        List<BadgeResult> badgeResults =
+        // 1. 모든 처리 대상을 한 번에 조회
+        List<BadgeResult> allBadgeResults =
                 badgeResultRepository.findByExecutionIdAndStatus(executionId, BatchResultStatus.PENDING);
-        if (badgeResults.isEmpty()) {
+        if (allBadgeResults.isEmpty()) {
             log.info("[배지 결과 적용] 처리할 대상 없음");
             return;
         }
 
-        List<Long> userIds = badgeResults.stream().map(BadgeResult::getUserId).toList();
+        List<Long> userIds = allBadgeResults.stream().map(BadgeResult::getUserId).distinct().toList();
         Map<String, Badge> badgeMap = badgeRepository.findByUserIdIn(userIds).stream()
-                .collect(Collectors.toMap(
-                        badge -> badge.getUser().getId() + ":" + badge.getCategory().getId(),
-                        Function.identity()
-                ));
+                .collect(Collectors.toMap(b -> b.getUser().getId() + ":" + b.getCategory().getId(), Function.identity()));
 
-        List<Badge> badgesToUpdate = new ArrayList<>();
+        // 2. 전체 대상을 청크 단위로 나누어 처리
+        for (int i = 0; i < allBadgeResults.size(); i += CHUNK_SIZE) {
+            List<BadgeResult> resultChunk = allBadgeResults.subList(i, Math.min(i + CHUNK_SIZE, allBadgeResults.size()));
 
-        for (BadgeResult result : badgeResults) {
-            try {
-                String key = result.getUserId() + ":" + result.getCategoryId();
-                Badge badge = badgeMap.get(key);
-                if (badge == null) continue;
-
-                // 자바 코드 내에서 조건부 업데이트 로직 실행
-                if (badge.getUpdatedAt() == null || badge.getUpdatedAt().isBefore(batchStartTime)) {
+            List<Badge> badgesToUpdateInChunk = new ArrayList<>();
+            for (BadgeResult result : resultChunk) {
+                Badge badge = badgeMap.get(result.getUserId() + ":" + result.getCategoryId());
+                if (badge != null && (badge.getUpdatedAt() == null || badge.getUpdatedAt().isBefore(batchStartTime))) {
                     badge.applyFromResult(result);
-                    badgesToUpdate.add(badge); // 변경된 Badge만 저장 대상에 추가
+                    badgesToUpdateInChunk.add(badge);
                 }
-
                 result.setStatus(BatchResultStatus.APPLIED);
                 result.setAppliedAt(LocalDateTime.now());
-            } catch (Exception e) {
-                result.setStatus(BatchResultStatus.FAILED);
-                log.error("배지 반영 실패 userId={}, categoryId={}", result.getUserId(), result.getCategoryId(), e);
             }
+
+            // 3. 분리된 클래스의 @Transactional 메소드를 호출하여 청크 처리
+            chunkProcessor.applyBadgeChunk(badgesToUpdateInChunk, resultChunk);
         }
-
-        if (!badgesToUpdate.isEmpty()) {
-            log.info("[badges 테이블 업데이트 시작] 대상: {}건", badgesToUpdate.size());
-            badgeRepository.saveAll(badgesToUpdate);
-            log.info("[badges 테이블 업데이트 완료]");
-        }
-
-        log.info("[badge_results 테이블 상태 업데이트 시작] 대상: {}건", badgeResults.size());
-        badgeResultRepository.saveAll(badgeResults);
-        log.info("[badge_results 테이블 상태 업데이트 완료]");
-
-        long duration = System.currentTimeMillis() - start;
-        log.info("[배지 결과 적용 완료] executionId={}, 소요 시간: {}ms", executionId, duration);
+        log.info("[배지 결과 적용 완료] executionId={}", executionId);
     }
-    /**
-     * 등급 업데이트: 로그 생성을 위해 엔티티를 조회하고 JPA 변경 감지(Dirty Checking)를 활용
-     */
+
     public void applyLevelResults(UUID executionId, LocalDateTime batchStartTime) {
         log.info("[레벨 결과 적용 시작] executionId={}", executionId);
-        long start = System.currentTimeMillis();
+        final int CHUNK_SIZE = 1000;
 
-        List<LevelResult> levelResults =
+        // 1. 모든 처리 대상을 한 번에 조회
+        List<LevelResult> allLevelResults =
                 levelResultRepository.findByExecutionIdAndStatus(executionId, BatchResultStatus.PENDING);
-        if (levelResults.isEmpty()) {
+        if (allLevelResults.isEmpty()) {
             log.info("[레벨 결과 적용] 처리할 대상 없음");
             return;
         }
 
-        List<Long> userIds = levelResults.stream().map(LevelResult::getUserId).toList();
+        List<Long> userIds = allLevelResults.stream().map(LevelResult::getUserId).distinct().toList();
         Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
 
-        List<MembershipLog> logsToSave = new ArrayList<>();
-        List<User> usersToUpdate = new ArrayList<>();
+        // 2. 전체 대상을 청크 단위로 나누어 처리
+        for (int i = 0; i < allLevelResults.size(); i += CHUNK_SIZE) {
+            List<LevelResult> resultChunk = allLevelResults.subList(i, Math.min(i + CHUNK_SIZE, allLevelResults.size()));
 
-        for (LevelResult result : levelResults) {
-            try {
+            List<User> usersToUpdateInChunk = new ArrayList<>();
+            for (LevelResult result : resultChunk) {
                 User user = userMap.get(result.getUserId());
-                if (user == null) continue;
-
-                //  자바 코드 내에서 조건부 업데이트 로직 실행
-                if (user.getLastMembershipChange() == null || user.getLastMembershipChange().isBefore(batchStartTime)) {
-                    MembershipLog log = user.recordLevelChange(result.getNewLevel(), "월간 배치 실행");
-                    if (log != null) {
-                        logsToSave.add(log);
-                    }
-                    user.applyLevelFromResult(result);
-                    usersToUpdate.add(user); // 변경된 User만 저장 대상에 추가
+                if (user != null && (user.getLastMembershipChange() == null || user.getLastMembershipChange().isBefore(batchStartTime))) {
+                    user.applyLevelAndLog(result, "월간 배치 실행");
+                    usersToUpdateInChunk.add(user);
                 }
                 result.setStatus(BatchResultStatus.APPLIED);
                 result.setAppliedAt(LocalDateTime.now());
-            } catch (Exception e) {
-                result.setStatus(BatchResultStatus.FAILED);
-                log.error("레벨 반영 실패 userId={}", result.getUserId(), e);
             }
-        }
 
-        if (!usersToUpdate.isEmpty()) {
-            log.info("[users 테이블 업데이트 시작] 대상: {}건", usersToUpdate.size());
-            userRepository.saveAll(usersToUpdate);
-            log.info("[users 테이블 업데이트 완료]");
+            // 3. 분리된 클래스의 @Transactional 메소드를 호출하여 청크 처리
+            chunkProcessor.applyLevelChunk(usersToUpdateInChunk, resultChunk);
         }
-        if (!logsToSave.isEmpty()) {
-            log.info("[membership_log 테이블 저장 시작] 대상: {}건", logsToSave.size());
-            membershipLogRepository.saveAll(logsToSave);
-            log.info("[membership_log 테이블 저장 완료]");
-        }
-
-        log.info("[level_results 테이블 상태 업데이트 시작] 대상: {}건", levelResults.size());
-        levelResultRepository.saveAll(levelResults);
-        long duration = System.currentTimeMillis() - start;
-        log.info("[레벨 결과 적용 완료] executionId={}, 소요 시간: {}ms", executionId, duration);
+        log.info("[레벨 결과 적용 완료] executionId={}", executionId);
     }
 }
