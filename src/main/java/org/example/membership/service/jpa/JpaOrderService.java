@@ -125,21 +125,25 @@ public class JpaOrderService {
         }).toList();
     }
 
-    @Transactional(readOnly = true)
-    public Map<String, Boolean> aggregateUserCategoryStats(LocalDate targetDate, LocalDateTime cutoffAt) {
-        LocalDateTime startDateTime = targetDate.atStartOfDay();
+    public Map<Long, Map<Long, OrderCountAndAmount>> aggregateUserCategoryStats(LocalDate targetDate, LocalDateTime cutoffAt) {
+        LocalDateTime startDateTime = targetDate.minusMonths(3).atStartOfDay();
         LocalDateTime endDateTime = cutoffAt;
 
         List<Object[]> results = orderRepository.aggregateUserCategoryStats(startDateTime, endDateTime);
-        Map<String, Boolean> keysToUpdate = new HashMap<>();
+
+        Map<Long, Map<Long, OrderCountAndAmount>> userStatMap = new HashMap<>();
 
         for (Object[] row : results) {
             Long userId = ((Number) row[0]).longValue();
-            Boolean hasActivity = ((Number) row[1]).longValue() > 0;
-            keysToUpdate.put(userId + ":badge", hasActivity); // 예시 key
-        }
+            Long categoryId = ((Number) row[1]).longValue();
+            long count = ((Number) row[2]).longValue();
+            BigDecimal amount = (BigDecimal) row[3];
 
-        return keysToUpdate;
+            OrderCountAndAmount stat = new OrderCountAndAmount(count, amount);
+
+            userStatMap.computeIfAbsent(userId, k -> new HashMap<>()).put(categoryId, stat);
+        }
+        return userStatMap;
     }
 
 

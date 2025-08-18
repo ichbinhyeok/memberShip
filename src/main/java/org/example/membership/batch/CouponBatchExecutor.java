@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.membership.common.util.PartitionUtils;
 import org.example.membership.entity.User;
 import org.example.membership.service.jpa.JpaCouponService;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -13,7 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 @Component
@@ -23,10 +23,9 @@ public class CouponBatchExecutor {
 
     private final JpaCouponService jpaCouponService;
 
-    /**
-     * 주어진 사용자 목록에 대해 쿠폰 발급을 병렬로 수행한다.
-     * 멱등성은 JpaCouponService 내부와 DB 제약 조건에서 보장한다.
-     */
+    @Qualifier("batchExecutorService")
+    private final ExecutorService executorService;
+
     public void execute(List<User> users, int batchSize, UUID executionId) {
         if (users == null || users.isEmpty()) {
             log.warn("[쿠폰 발급 스킵] 처리 대상 없음.");
@@ -36,7 +35,7 @@ public class CouponBatchExecutor {
         log.info("[쿠폰 발급 시작] 대상 수: {} | 배치 크기: {}", users.size(), batchSize);
         Instant totalStart = Instant.now();
 
-        ExecutorService executor = Executors.newFixedThreadPool(6);
+
         List<List<User>> partitions = PartitionUtils.partition(users, 6);
         List<Future<?>> futures = new ArrayList<>();
 
@@ -46,7 +45,7 @@ public class CouponBatchExecutor {
             final int partitionIndex = i;
             final List<User> part = partitions.get(i);
 
-            futures.add(executor.submit(() -> {
+            futures.add(executorService.submit(() -> {
                 Instant partitionStart = Instant.now();
                 try {
                     jpaCouponService.bulkIssueCoupons(part, batchSize);
@@ -64,14 +63,15 @@ public class CouponBatchExecutor {
         }
 
         try {
-            for (Future<?> f : futures) f.get();
+            for (Future<?> f : futures) {
+                f.get(); // 모든 파티션 작업이 완료될 때까지 대기
+            }
         } catch (Exception e) {
-            executor.shutdownNow();
             log.error("[쿠폰 발급 중단] 예외 발생", e);
+            // executor.shutdownNow();
             throw new RuntimeException("쿠폰 발급 중 예외 발생", e);
-        } finally {
-            executor.shutdown();
         }
+
 
         long total = Duration.between(totalStart, Instant.now()).toMillis();
         log.info("[쿠폰 발급 완료] 전체 대상: {} | 총 소요 시간: {}ms", users.size(), total);

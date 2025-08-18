@@ -49,7 +49,5 @@ public class WasInstance {
         this.lastHeartbeatAt = LocalDateTime.now();
     }
 
-    public boolean isAlive(LocalDateTime threshold) {
-        return this.lastHeartbeatAt != null && this.lastHeartbeatAt.isAfter(threshold);
-    }
+
 }

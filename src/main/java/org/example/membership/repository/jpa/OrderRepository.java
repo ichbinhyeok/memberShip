@@ -52,17 +52,34 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     );
 
 
-    @Query(value = """
-        SELECT o.user_id, SUM(oi.item_price * oi.quantity - IFNULL(c.discount_amount,0)) > 0
-        FROM orders o
-        JOIN order_items oi ON oi.order_id = o.id
-        LEFT JOIN coupons c ON o.coupon_id = c.id
-        WHERE o.status = 'PAID'
-          AND o.ordered_at >= :start
-          AND o.ordered_at < :end
-        GROUP BY o.user_id
-    """, nativeQuery = true)
-    List<Object[]> aggregateUserCategoryStats(@Param("start") LocalDateTime start,
-                                              @Param("end") LocalDateTime end);
-
+    @Query(
+            value = """
+        SELECT
+            o.user_id,
+            p.category_id,
+            COUNT(o.id) AS order_count,
+            SUM(oi.item_price * oi.quantity - IFNULL(c.discount_amount, 0)) AS total_amount
+        FROM
+            orders o
+        JOIN
+            order_items oi ON o.id = oi.order_id
+        JOIN
+            products p ON oi.product_id = p.id
+        LEFT JOIN
+            coupons c ON o.coupon_id = c.id
+        WHERE
+            o.status = 'PAID'
+            AND o.ordered_at >= :start
+            AND o.ordered_at < :end
+        GROUP BY
+            o.user_id,
+            p.category_id
+    """,
+            nativeQuery = true
+    )
+// 반환 타입이 Object 배열인 것은 동일
+    List<Object[]> aggregateUserCategoryStats(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
 }

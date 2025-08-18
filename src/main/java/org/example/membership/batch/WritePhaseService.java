@@ -3,18 +3,16 @@ package org.example.membership.batch;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.membership.entity.User;
-import org.example.membership.repository.jpa.batch.BadgeResultRepository;
-import org.example.membership.repository.jpa.batch.LevelResultRepository;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,8 +20,8 @@ import java.util.concurrent.TimeUnit;
 public class WritePhaseService {
 
     private final ChunkWriter chunkWriter;
-    private final BadgeResultRepository badgeResultRepository;
-    private final LevelResultRepository levelResultRepository;
+    @Qualifier("batchExecutorService")
+    private final ExecutorService executorService;
 
     public void persistAndApply(UUID executionId, CalcContext ctx) {
         if (ctx.empty()) {
@@ -31,52 +29,54 @@ public class WritePhaseService {
             return;
         }
 
-        ExecutorService executor = Executors.newFixedThreadPool(6, r -> {
-            Thread t = new Thread(r, "batch-chunk-");
-            t.setDaemon(true);
-            return t;
-        });
-
         try {
-            List<Long> userIds = ctx.myUsers().stream().map(User::getId).toList();
-            List<Future<?>> futures = new ArrayList<>();
+            // ==================== 1. 배지 계산 및 적용 ====================
+            log.info("[Phase 1] 배지 결과 계산 시작 (병렬 처리)");
+            List<Future<?>> badgeFutures = new ArrayList<>();
+            List<Map.Entry<String, Boolean>> badgeEntries = new ArrayList<>(ctx.keysToUpdate().entrySet());
 
-            for (int i = 0; i < userIds.size(); i += 500) {
-                List<Long> chunk = userIds.subList(i, Math.min(i + 500, userIds.size()));
-                futures.add(executor.submit(() ->
-                        chunkWriter.writeBadgeAndLevelChunk(executionId, chunk, ctx)));
+            for (int i = 0; i < badgeEntries.size(); i += 500) {
+                Map<String, Boolean> subMap = badgeEntries.subList(i, Math.min(i + 500, badgeEntries.size()))
+                        .stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                badgeFutures.add(executorService.submit(() ->
+                        chunkWriter.writeBadgeChunk(executionId, subMap, ctx.batchSize())));
             }
+            waitForFutures(badgeFutures);
+            log.info("[Phase 1] 배지 결과 계산 완료");
 
-            for (Future<?> f : futures) {
-                f.get(); // 완료 대기
+            log.info("[Phase 2] 배지 결과 적용 시작 (단일 트랜잭션)");
+            chunkWriter.applyBadgeResultsAll(executionId,ctx.batchStartTime());
+            log.info("[Phase 2] 배지 결과 적용 완료");
+
+            // ==================== 2. 레벨 계산 및 적용 ====================
+            log.info("[Phase 3] 레벨 결과 계산 시작 (병렬 처리)");
+            List<User> userList = ctx.myUsers();
+            List<Future<?>> levelFutures = new ArrayList<>();
+
+            for (int i = 0; i < userList.size(); i += 500) {
+                List<User> chunk = userList.subList(i, Math.min(i + 500, userList.size()));
+                levelFutures.add(executorService.submit(() ->
+                        chunkWriter.writeLevelChunk(executionId, chunk, ctx.batchSize(), ctx.batchStartTime())));
             }
+            waitForFutures(levelFutures);
+            log.info("[Phase 3] 레벨 결과 계산 완료");
 
-            chunkWriter.applyResultsAll(executionId);
+            log.info("[Phase 4] 레벨 결과 적용 시작 (단일 트랜잭션)");
+            chunkWriter.applyLevelResultsAll(executionId,ctx.batchStartTime());
+            log.info("[Phase 4] 레벨 결과 적용 완료");
 
         } catch (Exception e) {
-            executor.shutdownNow();
             throw new RuntimeException("쓰기 페이즈 실패", e);
-        } finally {
-            executor.shutdown();
-            try {
-                if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
-                    executor.shutdownNow();
-                }
-            } catch (InterruptedException ie) {
-                executor.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
+        }
+    }
+
+    private void waitForFutures(List<Future<?>> futures) throws Exception {
+        for (Future<?> f : futures) {
+            f.get();
         }
     }
 
     public void applyCoupon(UUID executionId, CalcContext ctx) {
         chunkWriter.applyCoupon(executionId, ctx);
-    }
-
-    @Transactional
-    public void clearResults(UUID executionId) {
-        log.info("Clearing results for executionId={}", executionId);
-        badgeResultRepository.deleteByExecutionId(executionId);
-        levelResultRepository.deleteByExecutionId(executionId);
     }
 }

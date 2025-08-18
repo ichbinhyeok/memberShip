@@ -1,6 +1,7 @@
 // org/example/membership/infra/cluster/ScaleOutNotifier.java
 package org.example.membership.infra.cluster;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.membership.entity.WasInstance;
 import org.example.membership.infra.cluster.dto.ScaleOutAckResponse;
@@ -13,10 +14,12 @@ import java.util.concurrent.*;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class ScaleOutNotifier {
 
     private final RestTemplate restTemplate = new RestTemplate();
-    private final ExecutorService executorService = Executors.newFixedThreadPool(10);
+    private final ExecutorService executorService;
+
 
     public void notifyOthers(List<WasInstance> others) throws Exception {
         List<CompletableFuture<Void>> futures = others.stream()
@@ -31,6 +34,15 @@ public class ScaleOutNotifier {
                 .toList();
         waitAll(futures, "일부 WAS 인스턴스에 배지 플래그 해제 실패");
     }
+
+
+    public void notifyBadgeFlagOnToOthers(List<WasInstance> others) throws Exception {
+        List<CompletableFuture<Void>> futures = others.stream()
+                .map(was -> CompletableFuture.runAsync(() -> sendNotification(was, "/internal/batch/badge-flag/on"), executorService))
+                .toList();
+        waitAll(futures, "일부 WAS 인스턴스에 배지 플래그 설정 실패");
+    }
+
 
     private void sendNotification(WasInstance was) {
         sendNotification(was, "/notify-scaleout");

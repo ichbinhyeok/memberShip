@@ -3,10 +3,12 @@ package org.example.membership.repository.jpa;
 import org.example.membership.common.enums.MembershipLevel;
 import org.example.membership.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,4 +32,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
 """)
     List<User> findUsersInRange(@Param("startId") long startId, @Param("endId") long endId);
 
+
+    @Modifying
+    @Query("UPDATE User u SET u.membershipLevel = :newLevel, u.lastMembershipChange = CURRENT_TIMESTAMP " +
+            "WHERE u.id = :userId AND (u.lastMembershipChange IS NULL OR u.lastMembershipChange < :batchStartTime)")
+    int updateUserLevelConditionally(@Param("userId") Long userId,
+                                     @Param("newLevel") MembershipLevel newLevel,
+                                     @Param("batchStartTime") LocalDateTime batchStartTime);
 }

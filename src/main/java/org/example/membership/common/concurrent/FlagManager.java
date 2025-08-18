@@ -56,4 +56,8 @@ public class FlagManager {
     }
 
     private String key(Long userId, Long categoryId) { return userId + ":" + categoryId; }
+
+    public boolean isBatchRunning() {
+       return isBadgeFlagged(-1L, -1L);
+    }
 }

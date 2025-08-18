@@ -5,7 +5,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.example.membership.common.enums.MembershipLevel;
-import org.example.membership.entity.User;
 
 import java.time.LocalDateTime;
 
@@ -22,9 +21,6 @@ public class MembershipLog {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-
-//    @Column(name = "user_id", insertable = false, updatable = false)
-//    private Long userId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "previous_level")
@@ -44,4 +40,12 @@ public class MembershipLog {
     protected void onCreate() {
         changedAt = LocalDateTime.now();
     }
-} 
+
+    // ✨ User.recordLevelChange에서 호출할 생성자를 추가합니다.
+    public MembershipLog(User user, MembershipLevel previousLevel, MembershipLevel newLevel, String changeReason) {
+        this.user = user;
+        this.previousLevel = previousLevel;
+        this.newLevel = newLevel;
+        this.changeReason = changeReason;
+    }
+}

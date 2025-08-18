@@ -2,11 +2,14 @@ package org.example.membership.service.jpa;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.membership.common.concurrent.FlagManager;
 import org.example.membership.dto.OrderCountAndAmount;
 import org.example.membership.entity.Badge;
+import org.example.membership.entity.BadgeLog;
 import org.example.membership.entity.Category;
 import org.example.membership.entity.User;
 import org.example.membership.exception.NotFoundException;
+import org.example.membership.repository.jpa.BadgeLogRepository;
 import org.example.membership.repository.jpa.BadgeRepository;
 import org.example.membership.repository.jpa.CategoryRepository;
 import org.example.membership.repository.jpa.UserRepository;
@@ -27,7 +30,8 @@ public class JpaBadgeService {
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final JpaOrderService jpaOrderService;
-
+    private final FlagManager flagManager;
+    private final BadgeLogRepository badgeLogRepository;
     // private final FlagManager flagManager; // 더 이상 배치 플래그에 의존하지 않음
 
     /**
@@ -72,6 +76,11 @@ public class JpaBadgeService {
                 .orElseThrow(() -> new NotFoundException("Category not found"));
         Badge badge = badgeRepository.findByUserAndCategory(user, category)
                 .orElseThrow(() -> new NotFoundException("Badge not found"));
+
+        if (flagManager.isBatchRunning()) {
+            BadgeLog log = new BadgeLog(badge.getId(), badge.isActive());
+            badgeLogRepository.save(log);
+        }
 
         if (active) {
             badge.activate();

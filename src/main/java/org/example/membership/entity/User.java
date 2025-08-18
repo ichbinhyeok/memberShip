@@ -41,6 +41,15 @@ public class User {
         this.name = name;
     }
 
+
+
+    public MembershipLog recordLevelChange(MembershipLevel newLevel, String reason) {
+        if (this.membershipLevel == newLevel) {
+            return null; // 등급 변경이 없으면 로그를 생성하지 않음
+        }
+        return new MembershipLog(this, this.membershipLevel, newLevel, reason);
+    }
+
     public void applyLevelFromResult(LevelResult result) {
         this.membershipLevel = result.getNewLevel();
         this.lastMembershipChange = LocalDateTime.now();

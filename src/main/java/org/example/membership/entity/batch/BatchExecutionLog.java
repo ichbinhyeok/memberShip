@@ -39,7 +39,7 @@ public class BatchExecutionLog {
     @Column(nullable = false)
     private BatchStatus status;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private boolean interruptedByScaleOut;
 
     private LocalDateTime interruptedAt;

@@ -10,6 +10,7 @@ import org.example.membership.repository.jpa.batch.LevelResultRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,7 +32,7 @@ public class LevelResultCalculator {
      * @param users 처리 대상 사용자 리스트
      * @param batchSize 한번에 저장할 배치 크기
      */
-    public void calculateAndStoreResults(UUID executionId, List<User> users, int batchSize) {
+    public void calculateAndStoreResults(UUID executionId, List<User> users, int batchSize, LocalDateTime batchStartTime) {
         if (CollectionUtils.isEmpty(users)) {
             log.warn("[등급 계산 스킵] 대상 없음. executionId={}", executionId);
             return;
@@ -39,8 +40,8 @@ public class LevelResultCalculator {
 
         log.info("[등급 결과 계산 시작] 대상: {}건, executionId={}", users.size(), executionId);
 
-        // 1. 모든 사용자의 활성 배지 개수를 한번의 쿼리로 조회 (효율성)
-        Map<Long, Long> userBadgeCountMap = getActiveBadgeCountMap(users);
+        // batchStartTime을 전달하여 T0 시점의 배지 개수를 조회
+        Map<Long, Long> userBadgeCountMap = getActiveBadgeCountMapAsOfT0(users, batchStartTime);
 
         // 2. 각 사용자의 새로운 등급을 계산하여 LevelResult 리스트 생성
         List<LevelResult> results = new ArrayList<>();
@@ -68,11 +69,12 @@ public class LevelResultCalculator {
     }
 
     /**
-     * 사용자 목록을 받아, 각 사용자의 활성 배지 개수를 Map 형태로 반환합니다.
+     * 사용자 목록을 받아,T0시점 각 사용자의 활성 배지 개수를 Map 형태로 반환합니다.
      */
-    private Map<Long, Long> getActiveBadgeCountMap(List<User> users) {
+    private Map<Long, Long> getActiveBadgeCountMapAsOfT0(List<User> users, LocalDateTime batchStartTime) {
         List<Long> userIds = users.stream().map(User::getId).collect(Collectors.toList());
-        List<Object[]> counts = badgeRepository.countActiveBadgesGroupedByUserIds(userIds);
+
+        List<Object[]> counts = badgeRepository.countActiveBadgesAsOfT0(userIds, batchStartTime);
 
         Map<Long, Long> map = new HashMap<>();
         for (Object[] row : counts) {
@@ -88,11 +90,11 @@ public class LevelResultCalculator {
      * (비즈니스 로직)
      */
     private MembershipLevel determineNewLevel(long activeBadgeCount) {
-        if (activeBadgeCount >= 3) {
+        if (activeBadgeCount >= 6) {
             return MembershipLevel.VIP;
-        } else if (activeBadgeCount >= 2) {
+        } else if (activeBadgeCount >= 4) {
             return MembershipLevel.GOLD;
-        } else if (activeBadgeCount >= 1) {
+        } else if (activeBadgeCount >= 2) {
             return MembershipLevel.SILVER;
         } else {
             return MembershipLevel.NONE;

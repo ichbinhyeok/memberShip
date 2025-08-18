@@ -24,7 +24,7 @@ spring:
     properties:
       hibernate:
         jdbc:
-          batch_size: 5000
+          batch_size: 500
         format_sql: true
         dialect: org.hibernate.dialect.MySQL8Dialect
         order_inserts: true
@@ -46,6 +46,8 @@ logging:
   level:
     root: INFO  # 전역 기본 로그 레벨을 에러로 제한
 
+    org.springframework.web: DEBUG
+    org.springdoc: DEBUG
     # [1] 내가 작성한 서비스 코드 (log.info() 찍힌 로그)
     org.example.membership: INFO
 
@@ -65,3 +67,12 @@ mybatis:
 
 was:
   index: 0  # 이 값을 WAS별로 다르게 설정 (예: 0번, 1번, 2번...)
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /v3/api-docs
+
+

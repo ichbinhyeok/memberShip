@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.UUID;
 
@@ -20,37 +21,28 @@ public class ChunkWriter {
     private final BatchResultApplier batchResultApplier;
     private final CouponBatchExecutor couponBatchExecutor;
 
+    //  1. 배지 결과 저장 역할만 수행
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void writeBadgeAndLevelChunk(UUID executionId,
-                                        List<Long> userIdChunk,
-                                        CalcContext ctx) {
-        if (userIdChunk.isEmpty()) return;
-
-        Set<Long> allow = new HashSet<>(userIdChunk);
-        List<User> users = ctx.myUsers().stream()
-                .filter(u -> allow.contains(u.getId()))
-                .toList();
-
-        Map<String, Boolean> subKeys = new HashMap<>();
-        for (Map.Entry<String, Boolean> e : ctx.keysToUpdate().entrySet()) {
-            String k = e.getKey();
-            int idx = k.indexOf(':');
-            long uid = Long.parseLong(k.substring(0, idx));
-            if (allow.contains(uid)) {
-                subKeys.put(k, e.getValue());
-            }
-        }
-
-        // 배지 결과 저장
-        badgeResultCalculator.calculateAndStoreResults(executionId, subKeys, ctx.batchSize());
-
-        // 레벨 결과 저장
-        levelResultCalculator.calculateAndStoreResults(executionId, users, ctx.batchSize());
+    public void writeBadgeChunk(UUID executionId, Map<String, Boolean> subKeys, int batchSize) {
+        badgeResultCalculator.calculateAndStoreResults(executionId, subKeys, batchSize);
     }
 
+    //  2. 레벨 결과 저장 역할만 수행
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void applyResultsAll(UUID executionId) {
-        batchResultApplier.applyResults(executionId);
+    public void writeLevelChunk(UUID executionId, List<User> users, int batchSize, LocalDateTime batchStartTime) {
+        levelResultCalculator.calculateAndStoreResults(executionId, users, batchSize, batchStartTime);
+    }
+
+    // 3. 배지 결과만 적용
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void applyBadgeResultsAll(UUID executionId, LocalDateTime batchStartTime) {
+        batchResultApplier.applyBadgeResults(executionId, batchStartTime);
+    }
+
+    //  4. 레벨 결과만 적용
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void applyLevelResultsAll(UUID executionId, LocalDateTime batchStartTime) {
+        batchResultApplier.applyLevelResults(executionId, batchStartTime);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
