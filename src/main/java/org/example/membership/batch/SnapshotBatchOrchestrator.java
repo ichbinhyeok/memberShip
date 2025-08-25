@@ -15,48 +15,52 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class SnapshotBatchOrchestrator {
-
-    private final BatchExecutionLogRepository batchRepo;
+    private final BatchExecutionLogTx logTx;
     private final ReadPhaseService readPhaseService;
     private final WritePhaseService writePhaseService;
 
-    @Transactional
     public boolean runFullBatch(LocalDate targetDate, int batchSize) {
-        UUID executionId = UUID.randomUUID();
-        LocalDateTime batchStartTime = LocalDateTime.now();
-        LocalDateTime cutoffAt = targetDate.atStartOfDay();
+        UUID exec = UUID.randomUUID();
+        LocalDateTime t0 = LocalDateTime.now();
+        LocalDateTime cutoff = targetDate.atStartOfDay();
 
-        int inserted = batchRepo.insertIfNotRunning(executionId, targetDate.toString(), cutoffAt);
-        if (inserted == 0) {
-            log.warn("다른 배치가 실행 중이므로 현재 배치를 건너뜁니다.");
+        if (!logTx.lockStart(exec, targetDate.toString(), cutoff)) {
+            log.warn("다른 배치 실행 중, 건너뜀");
             return false;
         }
 
-        BatchExecutionLog logEntity = batchRepo.findByExecutionId(executionId)
-                .orElseThrow(() -> new IllegalStateException("Execution record not found after insert"));
-
         try {
-            CalcContext ctx = readPhaseService.buildContext(targetDate, cutoffAt, batchSize, batchStartTime);
+            /* CalcContext {
+                    List<User> myUsers,
+                    Map<String, Boolean> keysToUpdate, = <userId + ":" + categoryId,배지 활성화여부>
+                    int batchSize,
+                    boolean empty,
+                    LocalDateTime batchStartTime
+            }
+
+            * */
+            CalcContext ctx = readPhaseService.buildContext(targetDate, cutoff, batchSize, t0);
             if (ctx.empty()) {
-                log.info("처리할 대상이 없어 배치를 완료합니다. executionId={}", executionId);
-                logEntity.markCompleted();
-                batchRepo.save(logEntity);
+                logTx.markCompleted(exec);
                 return true;
             }
 
-            writePhaseService.persistAndApply(logEntity.getExecutionId(), ctx);
-            writePhaseService.applyCoupon(logEntity.getExecutionId(), ctx);
+            // Phase 1~4 순서대로 명시 호출
+            // ctx에 있는 keyToUpdate를 통해 어떤 유저의 어떤 카테고리의 배지를 활성화할지 Result 스냅샷 테이블에 저장
+            writePhaseService.produceBadgeResults(exec, ctx);
+            writePhaseService.applyBadges(exec, t0);
 
-            logEntity.markCompleted();
-            batchRepo.save(logEntity);
-            log.info("배치 실행이 성공적으로 완료되었습니다. executionId={}", executionId);
+            writePhaseService.produceLevelResults(exec, ctx);
+            writePhaseService.applyLevels(exec, t0);
+
+            // 쿠폰 적용 단계는 그대로 마지막
+            writePhaseService.applyCoupon(exec, ctx);
+
+            logTx.markCompleted(exec);
             return true;
-
         } catch (Exception e) {
-            logEntity.markFailed();
-            batchRepo.save(logEntity);
-            log.error("[배지 배치] 실패 executionId={}", executionId, e);
-            return true;
+            logTx.markFailed(exec);
+            throw e;
         }
     }
 }

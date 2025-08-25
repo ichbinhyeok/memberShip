@@ -28,6 +28,7 @@ public class ReadPhaseService {
     public CalcContext buildContext(LocalDate targetDate, LocalDateTime cutoffAt, int batchSize, LocalDateTime batchStartTime) {
         List<User> allUsers = userRepository.findAll();
 
+        //Map<userId,Map<categoryId,{long Count,BigDecimal Amount}>>,유저별 카테고리별 주문 개수와 주문액
         Map<Long, Map<Long, OrderCountAndAmount>> statMap =
                 jpaOrderService.aggregateUserCategoryStats(targetDate, cutoffAt);
 

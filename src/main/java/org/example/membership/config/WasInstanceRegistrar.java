@@ -71,22 +71,23 @@ import java.util.UUID;
         myWasInstanceHolder.setTotalWases(aliveInstances.size());
         log.info("내 WAS 인덱스 계산 완료. Index: {} / Total: {}", myIndex, aliveInstances.size());
 
-        // 5. 다른 인스턴스에게 Scale-out 알림 전송
-        List<WasInstance> others = aliveInstances.stream()
-                .filter(was -> !was.getId().equals(uuid))
-                .toList();
-
-        if (!others.isEmpty()) {
-            log.info("Scale-out 알림 전송 시작. 대상 WAS 수: {}", others.size());
-            try {
-                scaleOutNotifier.notifyOthers(others);  // 동기 병렬 방식으로 변경됨
-                log.info("모든 다른 인스턴스에 Scale-out 알림을 성공적으로 보냈습니다.");
-            } catch (Exception e) {
-                log.error("다른 인스턴스에 Scale-out 알림을 보내는 중 심각한 오류 발생. 애플리케이션 시작을 중단합니다.", e);
-                throw e;
-            }
-        } else {
-            log.info("클러스터의 첫번째 WAS입니다. Scale-out 알림을 보낼 대상이 없습니다.");
-        }
+        /*Legacy 이제 스케일 아웃 감지 불필요*/
+//        // 5. 다른 인스턴스에게 Scale-out 알림 전송
+//        List<WasInstance> others = aliveInstances.stream()
+//                .filter(was -> !was.getId().equals(uuid))
+//                .toList();
+//
+//        if (!others.isEmpty()) {
+//            log.info("Scale-out 알림 전송 시작. 대상 WAS 수: {}", others.size());
+//            try {
+//                scaleOutNotifier.notifyOthers(others);  // 동기 병렬 방식으로 변경됨
+//                log.info("모든 다른 인스턴스에 Scale-out 알림을 성공적으로 보냈습니다.");
+//            } catch (Exception e) {
+//                log.error("다른 인스턴스에 Scale-out 알림을 보내는 중 심각한 오류 발생. 애플리케이션 시작을 중단합니다.", e);
+//                throw e;
+//            }
+//        } else {
+//            log.info("클러스터의 첫번째 WAS입니다. Scale-out 알림을 보낼 대상이 없습니다.");
+//        }
     }
 }

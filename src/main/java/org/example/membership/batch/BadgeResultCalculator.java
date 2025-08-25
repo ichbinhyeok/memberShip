@@ -31,7 +31,6 @@ public class BadgeResultCalculator {
 
         log.info("[배지 결과 계산 시작] 대상: {}건, executionId={}", keysToUpdate.size(), executionId);
 
-        //  Map.Entry를 사용하여 key와 value(newState)를 모두 사용
         List<BadgeResult> results = keysToUpdate.entrySet().stream()
                 .map(entry -> parseToBadgeResult(executionId, entry.getKey(), entry.getValue()))
                 .collect(Collectors.toList());
@@ -41,6 +40,8 @@ public class BadgeResultCalculator {
     }
 
     private BadgeResult parseToBadgeResult(UUID executionId, String key, boolean newState) {
+        //key는 String "userId +":"+categoryId"
+
         try {
             String[] parts = key.split(":");
             Long userId = Long.parseLong(parts[0]);

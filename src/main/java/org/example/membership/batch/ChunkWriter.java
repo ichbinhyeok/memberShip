@@ -1,14 +1,17 @@
+// ChunkWriter.java
 package org.example.membership.batch;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.membership.entity.User;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -21,26 +24,25 @@ public class ChunkWriter {
     private final BatchResultApplier batchResultApplier;
     private final CouponBatchExecutor couponBatchExecutor;
 
-    //  1. 배지 결과 저장 역할만 수행
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void writeBadgeChunk(UUID executionId, Map<String, Boolean> subKeys, int batchSize) {
         badgeResultCalculator.calculateAndStoreResults(executionId, subKeys, batchSize);
     }
 
-    //  2. 레벨 결과 저장 역할만 수행
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void writeLevelChunk(UUID executionId, List<User> users, int batchSize, LocalDateTime batchStartTime) {
-        levelResultCalculator.calculateAndStoreResults(executionId, users, batchSize, batchStartTime);
+    public void writeLevelChunk(UUID executionId, List<User> users, int batchSize) {
+        levelResultCalculator.calculateAndStoreResults(executionId, users, batchSize);
     }
 
-    // 3. 배지 결과만 적용
-    public void applyBadgeResultsAll(UUID executionId, LocalDateTime batchStartTime) {
-        batchResultApplier.applyBadgeResults(executionId, batchStartTime);
+    // 최신 스냅샷에서 페이지로 읽고, 저장은 내부 REQUIRES_NEW로 커밋
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true, isolation = Isolation.READ_COMMITTED)
+    public void applyBadgeResultsPaged(UUID executionId, LocalDateTime batchStartTime, int pageSize) {
+        batchResultApplier.applyBadgeResultsPaged(executionId, batchStartTime, pageSize);
     }
 
-    //  4. 레벨 결과만 적용
-    public void applyLevelResultsAll(UUID executionId, LocalDateTime batchStartTime) {
-        batchResultApplier.applyLevelResults(executionId, batchStartTime);
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true, isolation = Isolation.READ_COMMITTED)
+    public void applyLevelResultsPaged(UUID executionId, LocalDateTime batchStartTime, int pageSize) {
+        batchResultApplier.applyLevelResultsPaged(executionId, batchStartTime, pageSize);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

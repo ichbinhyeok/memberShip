@@ -43,6 +43,8 @@ public class JpaBadgeService {
                                                          Map<Long, Map<Long, OrderCountAndAmount>> statMap) {
         List<Badge> allBadges = badgeRepository.findAllByUserIn(users);
         Map<String, Boolean> targets = new HashMap<>();
+        //배지 획득/유지 조건 금액 (정책 각 카테고리 구매 횟수 5회 이상, 40만원 이상)
+        BigDecimal compareDecimal = new BigDecimal("400000");
 
         for (Badge badge : allBadges) {
             Long userId = badge.getUser().getId();
@@ -52,8 +54,9 @@ public class JpaBadgeService {
             // 배지 획득/유지 조건
             boolean shouldBeActive = stat != null &&
                     stat.getCount() >= 5 &&
-                    stat.getAmount().compareTo(new BigDecimal("400000")) >= 0;
+                    stat.getAmount().compareTo(compareDecimal) >= 0;
 
+            //배지 변동이 필요한 경우
             if (badge.isActive() != shouldBeActive) {
                 //  key-value 형태로 새로운 상태(shouldBeActive)를 함께 저장
                 targets.put(userId + ":" + categoryId, shouldBeActive);

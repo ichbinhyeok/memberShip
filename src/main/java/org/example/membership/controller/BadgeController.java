@@ -37,12 +37,14 @@ public class BadgeController {
     @PostMapping("/activate")
     public ResponseEntity<String> activate(@RequestBody BadgeActivationRequest request) {
         // 여기서는 애플리케이션 레벨에 유지합니다.
-        if (!myWasInstanceHolder.isMyUser(request.getUserId())) {
-            // 이 요청을 처리할 올바른 WAS로 리다이렉트하거나, 클라이언트가 직접 올바른 노드로 요청하도록 유도할 수 있습니다.
-            // 여기서는 간단히 요청을 거부합니다.
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body("This request should be handled by another WAS instance.");
-        }
+
+        /*Legacy*/
+//        if (!myWasInstanceHolder.isMyUser(request.getUserId())) {
+//            // 이 요청을 처리할 올바른 WAS로 리다이렉트하거나, 클라이언트가 직접 올바른 노드로 요청하도록 유도할 수 있습니다.
+//            // 여기서는 간단히 요청을 거부합니다.
+//            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+//                    .body("This request should be handled by another WAS instance.");
+//        }
 
         jpaBadgeService.changeBadgeActivation(
                 request.getUserId(),
